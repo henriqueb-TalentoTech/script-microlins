@@ -1,6 +1,6 @@
 (function() {
   console.clear();
-  console.log('🚀 Carregando Auto-Preenchedor v4.0 (CORRIGIDO)...');
+  console.log('🚀 Carregando Auto-Preenchedor v5.0 (Minimalista)...');
   
   // ═══════════════════════════════════════════════════════════
   // PARTE 1: BUSCAR GABARITO AUTOMATICAMENTE
@@ -64,7 +64,7 @@
   }
   
   // ═══════════════════════════════════════════════════════════
-  // PARTE 2: CRIAR INTERFACE VISUAL
+  // PARTE 2: CRIAR INTERFACE MINIMALISTA
   // ═══════════════════════════════════════════════════════════
   
   function criarInterface() {
@@ -78,22 +78,24 @@
         #auto-preenchedor-ui {
           position: fixed;
           top: 20px;
-          right: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          left: 20px;
+          background: rgba(30, 30, 30, 0.95);
+          backdrop-filter: blur(10px);
           color: white;
-          padding: 20px;
-          border-radius: 15px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          padding: 12px 15px;
+          border-radius: 10px;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.4);
           z-index: 999999;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          min-width: 320px;
-          max-width: 400px;
-          animation: slideIn 0.3s ease-out;
+          font-family: 'Segoe UI', system-ui, sans-serif;
+          min-width: 200px;
+          max-width: 250px;
+          animation: slideInLeft 0.3s ease-out;
+          font-size: 13px;
         }
         
-        @keyframes slideIn {
+        @keyframes slideInLeft {
           from {
-            transform: translateX(400px);
+            transform: translateX(-300px);
             opacity: 0;
           }
           to {
@@ -102,53 +104,90 @@
           }
         }
         
-        #auto-preenchedor-ui h3 {
-          margin: 0 0 15px 0;
-          font-size: 20px;
+        #auto-preenchedor-ui.minimized {
+          padding: 8px 12px;
+          min-width: 50px;
+          cursor: pointer;
+        }
+        
+        #auto-preenchedor-ui.minimized .content {
+          display: none;
+        }
+        
+        #auto-preenchedor-ui .header {
           display: flex;
           align-items: center;
-          gap: 10px;
+          justify-content: space-between;
+          margin-bottom: 10px;
+          gap: 8px;
+        }
+        
+        #auto-preenchedor-ui .title {
+          font-size: 14px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        
+        #auto-preenchedor-ui .btn-minimize {
+          background: none;
+          border: none;
+          color: white;
+          cursor: pointer;
+          padding: 2px 6px;
+          font-size: 16px;
+          opacity: 0.6;
+          transition: opacity 0.2s;
+        }
+        
+        #auto-preenchedor-ui .btn-minimize:hover {
+          opacity: 1;
         }
         
         #auto-preenchedor-ui .status {
-          background: rgba(255,255,255,0.2);
-          padding: 12px;
-          border-radius: 8px;
-          margin-bottom: 15px;
-          font-size: 14px;
-          line-height: 1.6;
+          background: rgba(255,255,255,0.1);
+          padding: 8px 10px;
+          border-radius: 6px;
+          margin-bottom: 10px;
+          font-size: 12px;
+          line-height: 1.4;
         }
         
-        #auto-preenchedor-ui .gabarito-preview {
-          background: rgba(0,0,0,0.2);
-          padding: 10px;
-          border-radius: 8px;
-          margin-bottom: 15px;
-          max-height: 200px;
-          overflow-y: auto;
-          font-size: 13px;
-          line-height: 1.8;
+        #auto-preenchedor-ui .progress-mini {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 10px;
+          font-size: 12px;
         }
         
-        #auto-preenchedor-ui .gabarito-preview::-webkit-scrollbar {
-          width: 6px;
-        }
-        
-        #auto-preenchedor-ui .gabarito-preview::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.3);
-          border-radius: 3px;
-        }
-        
-        #auto-preenchedor-ui button {
+        #auto-preenchedor-ui .progress-bar-mini {
           width: 100%;
-          padding: 12px;
-          border: none;
-          border-radius: 8px;
-          font-size: 16px;
-          font-weight: bold;
-          cursor: pointer;
-          transition: all 0.3s;
+          height: 6px;
+          background: rgba(255,255,255,0.2);
+          border-radius: 3px;
+          overflow: hidden;
           margin-bottom: 8px;
+        }
+        
+        #auto-preenchedor-ui .progress-fill-mini {
+          height: 100%;
+          background: #10b981;
+          width: 0%;
+          transition: width 0.3s ease;
+        }
+        
+        #auto-preenchedor-ui button.action-btn {
+          width: 100%;
+          padding: 8px 12px;
+          border: none;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          margin-bottom: 6px;
         }
         
         #auto-preenchedor-ui .btn-iniciar {
@@ -156,103 +195,60 @@
           color: white;
         }
         
-        #auto-preenchedor-ui .btn-iniciar:hover {
+        #auto-preenchedor-ui .btn-iniciar:hover:not(:disabled) {
           background: #059669;
-          transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(16,185,129,0.4);
+          transform: translateY(-1px);
         }
         
         #auto-preenchedor-ui .btn-iniciar:disabled {
-          background: #6b7280;
+          background: #4b5563;
           cursor: not-allowed;
-          transform: none;
+          opacity: 0.6;
         }
         
         #auto-preenchedor-ui .btn-fechar {
-          background: rgba(255,255,255,0.2);
+          background: rgba(239, 68, 68, 0.8);
           color: white;
-          font-size: 14px;
+          font-size: 12px;
+          padding: 6px 10px;
         }
         
         #auto-preenchedor-ui .btn-fechar:hover {
-          background: rgba(255,255,255,0.3);
-        }
-        
-        #auto-preenchedor-ui .progress-bar {
-          width: 100%;
-          height: 25px;
-          background: rgba(0,0,0,0.2);
-          border-radius: 12px;
-          overflow: hidden;
-          margin-bottom: 10px;
-          position: relative;
-        }
-        
-        #auto-preenchedor-ui .progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #10b981, #34d399);
-          width: 0%;
-          transition: width 0.3s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 12px;
-        }
-        
-        #auto-preenchedor-ui .questao-atual {
-          text-align: center;
-          font-size: 14px;
-          margin-bottom: 15px;
-          padding: 8px;
-          background: rgba(0,0,0,0.2);
-          border-radius: 8px;
-        }
-        
-        .questao-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 4px 0;
-        }
-        
-        .questao-item.current {
-          background: rgba(255,255,255,0.2);
-          padding: 4px 8px;
-          border-radius: 4px;
-          animation: pulse 1s infinite;
-        }
-        
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
+          background: rgba(220, 38, 38, 0.9);
         }
       </style>
       
-      <h3>
-        <span>🤖</span>
-        <span>Auto-Preenchedor</span>
-      </h3>
-      
-      <div id="status" class="status">
-        🔍 Buscando gabarito...
-      </div>
-      
-      <div id="gabarito-preview" class="gabarito-preview" style="display: none;"></div>
-      
-      <div id="progress-container" style="display: none;">
-        <div class="questao-atual" id="questao-atual"></div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="progress-fill">0%</div>
+      <div class="header">
+        <div class="title">
+          <span>🤖</span>
+          <span>Auto-Fill</span>
         </div>
+        <button class="btn-minimize" id="btn-minimize" title="Minimizar">−</button>
       </div>
       
-      <button id="btn-iniciar" class="btn-iniciar" disabled>
-        Carregando...
-      </button>
-      
-      <button id="btn-fechar" class="btn-fechar">
-        Fechar
-      </button>
+      <div class="content">
+        <div id="status" class="status">
+          🔍 Buscando...
+        </div>
+        
+        <div id="progress-container" style="display: none;">
+          <div class="progress-mini" id="progress-text">
+            <span id="questao-num">Q1/10</span>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div class="progress-bar-mini">
+            <div class="progress-fill-mini" id="progress-fill"></div>
+          </div>
+        </div>
+        
+        <button id="btn-iniciar" class="action-btn btn-iniciar" disabled>
+          Aguarde...
+        </button>
+        
+        <button id="btn-fechar" class="action-btn btn-fechar">
+          ✕ Fechar
+        </button>
+      </div>
     `;
     
     document.body.appendChild(ui);
@@ -260,50 +256,40 @@
   }
   
   // ═══════════════════════════════════════════════════════════
-  // PARTE 3: FUNÇÃO PARA CLICAR NAS ALTERNATIVAS (CORRIGIDA!)
+  // PARTE 3: FUNÇÃO PARA CLICAR NAS ALTERNATIVAS
   // ═══════════════════════════════════════════════════════════
   
   function clicarAlternativa(indice) {
-    // Método 1: Procurar pelo input radio
     const radioInput = document.querySelector(`input[type="radio"][id="${indice}"]`);
     
     if (radioInput) {
-      // Clicar no input
       radioInput.click();
       
-      // Disparar evento change
       const event = new Event('change', { bubbles: true });
       radioInput.dispatchEvent(event);
       
-      // Também clicar no label
       const label = radioInput.closest('label');
       if (label) {
         label.click();
       }
       
-      console.log(`✓ Alternativa ${indice} clicada (método 1: input)`);
       return true;
     }
     
-    // Método 2: Procurar pelo label com for="${indice}"
     const label = document.querySelector(`label[for="${indice}"]`);
     
     if (label) {
       label.click();
-      console.log(`✓ Alternativa ${indice} clicada (método 2: label)`);
       return true;
     }
     
-    // Método 3: Procurar por índice na lista de alternativas
     const alternativas = document.querySelectorAll('.alternative-box label');
     
     if (alternativas && alternativas[indice]) {
       alternativas[indice].click();
-      console.log(`✓ Alternativa ${indice} clicada (método 3: índice)`);
       return true;
     }
     
-    console.error(`❌ Não conseguiu clicar na alternativa ${indice}`);
     return false;
   }
   
@@ -313,49 +299,52 @@
   
   const ui = criarInterface();
   const statusEl = document.getElementById('status');
-  const gabaritoPreviewEl = document.getElementById('gabarito-preview');
   const btnIniciar = document.getElementById('btn-iniciar');
   const btnFechar = document.getElementById('btn-fechar');
+  const btnMinimize = document.getElementById('btn-minimize');
   const progressContainer = document.getElementById('progress-container');
   const progressFill = document.getElementById('progress-fill');
-  const questaoAtualEl = document.getElementById('questao-atual');
+  const questaoNum = document.getElementById('questao-num');
+  const progressPercent = document.getElementById('progress-percent');
   
   let gabarito = null;
   let isRunning = false;
+  let isMinimized = false;
+  
+  // Minimizar/Maximizar
+  btnMinimize.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isMinimized = !isMinimized;
+    ui.classList.toggle('minimized');
+    btnMinimize.textContent = isMinimized ? '+' : '−';
+  });
+  
+  ui.addEventListener('click', () => {
+    if (isMinimized) {
+      isMinimized = false;
+      ui.classList.remove('minimized');
+      btnMinimize.textContent = '−';
+    }
+  });
   
   // Buscar gabarito
   setTimeout(() => {
     gabarito = buscarGabarito();
     
     if (!gabarito) {
-      statusEl.innerHTML = `
-        ❌ Gabarito não encontrado<br>
-        <small>Clique em COMEÇAR o teste primeiro</small>
-      `;
-      btnIniciar.textContent = '❌ Gabarito não disponível';
+      statusEl.innerHTML = `❌ Não encontrado<br><small>Inicie o teste</small>`;
+      btnIniciar.textContent = '❌ Indisponível';
       return;
     }
     
     const letras = ['A', 'B', 'C', 'D', 'E'];
     
-    statusEl.innerHTML = `
-      ✅ Gabarito encontrado!<br>
-      <small>${gabarito.length} questões detectadas</small>
-    `;
-    
-    gabaritoPreviewEl.style.display = 'block';
-    gabaritoPreviewEl.innerHTML = gabarito.map((resp, i) => 
-      `<div class="questao-item" id="q-item-${i}">
-        <span>Q${i+1}:</span>
-        <strong>${letras[resp]}</strong>
-      </div>`
-    ).join('');
+    statusEl.innerHTML = `✅ ${gabarito.length} questões<br><small>${gabarito.map((r, i) => `${i+1}:${letras[r]}`).join(' ')}</small>`;
     
     btnIniciar.disabled = false;
-    btnIniciar.textContent = '🚀 Iniciar Preenchimento Automático';
+    btnIniciar.textContent = '▶ Iniciar';
     
-    console.log('✅ Gabarito carregado:', gabarito);
-    console.log('✅ Gabarito em letras:', gabarito.map((r, i) => `Q${i+1}: ${letras[r]}`));
+    console.log('✅ Gabarito:', gabarito.map((r, i) => `Q${i+1}: ${letras[r]}`).join(', '));
   }, 500);
   
   // Função principal de preenchimento
@@ -364,113 +353,75 @@
     
     isRunning = true;
     btnIniciar.disabled = true;
-    btnIniciar.textContent = '⏳ Preenchendo...';
+    btnIniciar.textContent = '⏳ Rodando...';
     progressContainer.style.display = 'block';
+    statusEl.style.display = 'none';
     
     const letras = ['A', 'B', 'C', 'D', 'E'];
-    
-    // Verificar questão atual
     const modoAtual = localStorage.getItem('tela');
     let currentQuestion = (modoAtual && parseInt(modoAtual) > 0) ? parseInt(modoAtual) - 1 : 0;
-    
-    console.log(`📍 Iniciando da questão ${currentQuestion + 1}`);
     
     for (let i = currentQuestion; i < gabarito.length; i++) {
       const respostaCorreta = gabarito[i];
       
-      // Atualizar UI
-      questaoAtualEl.innerHTML = `
-        📝 Preenchendo questão <strong>${i + 1}</strong> de <strong>${gabarito.length}</strong><br>
-        Resposta: <strong>${letras[respostaCorreta]}</strong>
-      `;
+      questaoNum.textContent = `Q${i + 1}/${gabarito.length} → ${letras[respostaCorreta]}`;
       
       const progresso = Math.round(((i + 1) / gabarito.length) * 100);
       progressFill.style.width = progresso + '%';
-      progressFill.textContent = progresso + '%';
+      progressPercent.textContent = progresso + '%';
       
-      // Destacar questão atual
-      document.querySelectorAll('.questao-item').forEach(el => el.classList.remove('current'));
-      const itemEl = document.getElementById(`q-item-${i}`);
-      if (itemEl) itemEl.classList.add('current');
-      
-      // Aguardar um pouco para UI atualizar
       await new Promise(resolve => setTimeout(resolve, 400));
       
-      // Clicar na alternativa correta
       const sucesso = clicarAlternativa(respostaCorreta);
       
       if (!sucesso) {
-        console.error(`❌ Falha ao marcar questão ${i+1}`);
-        statusEl.innerHTML = `
-          ⚠️ Erro na questão ${i+1}<br>
-          <small>Continue manualmente ou recarregue</small>
-        `;
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = `⚠️ Erro Q${i+1}<br><small>Continue manual</small>`;
         isRunning = false;
         btnIniciar.disabled = false;
-        btnIniciar.textContent = '🔄 Tentar Novamente';
+        btnIniciar.textContent = '🔄 Continuar';
         return;
       }
       
-      console.log(`✅ Q${i+1}: Marcada alternativa ${letras[respostaCorreta]}`);
+      console.log(`✓ Q${i+1}: ${letras[respostaCorreta]}`);
       
-      // Aguardar antes de avançar
       await new Promise(resolve => setTimeout(resolve, 600));
       
-      // Avançar para próxima questão (se não for a última)
       if (i < gabarito.length - 1) {
         const btnProximo = document.querySelector('.nav_buttons_right');
         
         if (btnProximo) {
           btnProximo.click();
-          console.log('⏭️ Avançando para próxima questão...');
           await new Promise(resolve => setTimeout(resolve, 800));
         } else {
-          console.error('❌ Botão "Próxima" não encontrado');
-          statusEl.innerHTML = `
-            ⚠️ Botão próxima não encontrado<br>
-            <small>Avance manualmente e clique em Continuar</small>
-          `;
+          statusEl.style.display = 'block';
+          statusEl.innerHTML = `⚠️ Botão próxima<br><small>Avance manual</small>`;
           isRunning = false;
           btnIniciar.disabled = false;
-          btnIniciar.textContent = '🔄 Continuar Preenchimento';
+          btnIniciar.textContent = '🔄 Continuar';
           return;
         }
       }
     }
     
-    // Concluído!
-    questaoAtualEl.innerHTML = `
-      ✅ <strong>Todas as questões preenchidas!</strong><br>
-      <small>Clique em "ENVIAR RESPOSTAS"</small>
-    `;
+    progressFill.style.background = '#10b981';
+    questaoNum.textContent = '✅ Concluído!';
+    progressPercent.textContent = '100%';
     
-    statusEl.innerHTML = `
-      🎉 <strong>Concluído com sucesso!</strong><br>
-      <small>Agora clique em ENVIAR RESPOSTAS</small>
-    `;
-    
-    progressFill.style.background = 'linear-gradient(90deg, #10b981, #10b981)';
-    
-    btnIniciar.textContent = '✅ Concluído!';
+    btnIniciar.textContent = '✅ Finalizado';
     btnIniciar.style.background = '#10b981';
     
-    console.log('');
-    console.log('%c🎉 PREENCHIMENTO AUTOMÁTICO CONCLUÍDO!', 'color: green; font-size: 20px; font-weight: bold;');
-    console.log('%c👉 Clique em "ENVIAR RESPOSTAS" para finalizar', 'color: orange; font-size: 16px;');
+    console.log('🎉 Concluído! Clique em ENVIAR RESPOSTAS');
     
     isRunning = false;
   }
   
-  // Event listeners
   btnIniciar.addEventListener('click', preencherQuestoes);
   
   btnFechar.addEventListener('click', () => {
     ui.remove();
-    console.log('Interface fechada');
   });
   
-  console.log('✅ Auto-Preenchedor v4.0 carregado com sucesso!');
-  console.log('📋 Estrutura HTML detectada e mapeada');
-  console.log('🎯 Pronto para preencher automaticamente');
+  console.log('✅ Auto-Preenchedor Minimalista carregado!');
   
 })();
