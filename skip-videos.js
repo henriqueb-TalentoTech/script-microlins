@@ -1,3 +1,4 @@
+// skip-videos.js
 (function() {
   console.log('🚀 ===== INICIANDO BYPASS DE FINALIZAÇÃO =====');
   
