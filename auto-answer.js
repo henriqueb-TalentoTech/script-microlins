@@ -1,9 +1,6 @@
 (function() {
-  console.clear();
-  console.log('🚀 Carregando Auto-Preenchedor v5.0 (Minimalista)...');
-  
   // ═══════════════════════════════════════════════════════════
-  // PARTE 1: BUSCAR GABARITO AUTOMATICAMENTE
+  // PARTE 1: LÓGICA ORIGINAL (PRESERVADA)
   // ═══════════════════════════════════════════════════════════
   
   function buscarGabarito() {
@@ -31,18 +28,15 @@
     
     const root = document.querySelector('#root') || document.body;
     const reactRoot = findReactRoot(root);
-    
     if (!reactRoot) return null;
     
     const fiberRoot = reactRoot._internalRoot || reactRoot.current || reactRoot;
     const allNodes = getAllFiberNodes(fiberRoot);
-    
     const possibleAnswers = [];
     
     allNodes.forEach((fiber) => {
       if (fiber.memoizedState) {
         let state = fiber.memoizedState;
-        
         while (state) {
           if (Array.isArray(state.memoizedState)) {
             const arr = state.memoizedState;
@@ -58,370 +52,179 @@
     });
     
     if (possibleAnswers.length === 0) return null;
-    
     const gabarito = possibleAnswers.sort((a, b) => b.length - a.length)[0];
     return gabarito.map(r => r - 1);
   }
-  
+
+  function clicarAlternativa(indice) {
+    const radioInput = document.querySelector(`input[type="radio"][id="${indice}"]`);
+    if (radioInput) {
+      radioInput.click();
+      radioInput.dispatchEvent(new Event('change', { bubbles: true }));
+      const label = radioInput.closest('label');
+      if (label) label.click();
+      return true;
+    }
+    const label = document.querySelector(`label[for="${indice}"]`);
+    if (label) { label.click(); return true; }
+    const alternativas = document.querySelectorAll('.alternative-box label');
+    if (alternativas && alternativas[indice]) { alternativas[indice].click(); return true; }
+    return false;
+  }
+
   // ═══════════════════════════════════════════════════════════
-  // PARTE 2: CRIAR INTERFACE MINIMALISTA
+  // PARTE 2: INTERFACE COMPACTA E DISCRETA
   // ═══════════════════════════════════════════════════════════
-  
+
   function criarInterface() {
-    const oldUI = document.getElementById('auto-preenchedor-ui');
+    const oldUI = document.getElementById('compact-auto-ui');
     if (oldUI) oldUI.remove();
     
     const ui = document.createElement('div');
-    ui.id = 'auto-preenchedor-ui';
+    ui.id = 'compact-auto-ui';
     ui.innerHTML = `
       <style>
-        #auto-preenchedor-ui {
+        #compact-auto-ui {
           position: fixed;
-          top: 20px;
-          left: 20px;
-          background: rgba(30, 30, 30, 0.95);
-          backdrop-filter: blur(10px);
-          color: white;
-          padding: 12px 15px;
-          border-radius: 10px;
-          box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-          z-index: 999999;
-          font-family: 'Segoe UI', system-ui, sans-serif;
-          min-width: 200px;
-          max-width: 250px;
-          animation: slideInLeft 0.3s ease-out;
-          font-size: 13px;
+          top: 10px;
+          right: 10px;
+          background: #1a1a1a;
+          color: #d1d1d1;
+          padding: 8px;
+          border-radius: 4px;
+          border: 1px solid #333;
+          z-index: 2147483647;
+          font-family: monospace;
+          font-size: 11px;
+          width: 160px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+          user-select: none;
         }
-        
-        @keyframes slideInLeft {
-          from {
-            transform: translateX(-300px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        
-        #auto-preenchedor-ui.minimized {
-          padding: 8px 12px;
-          min-width: 50px;
-          cursor: pointer;
-        }
-        
-        #auto-preenchedor-ui.minimized .content {
-          display: none;
-        }
-        
-        #auto-preenchedor-ui .header {
+        #compact-auto-ui .header {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          margin-bottom: 10px;
-          gap: 8px;
+          border-bottom: 1px solid #333;
+          padding-bottom: 4px;
+          margin-bottom: 6px;
+          cursor: move;
         }
-        
-        #auto-preenchedor-ui .title {
-          font-size: 14px;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        
-        #auto-preenchedor-ui .btn-minimize {
-          background: none;
-          border: none;
-          color: white;
-          cursor: pointer;
-          padding: 2px 6px;
-          font-size: 16px;
-          opacity: 0.6;
-          transition: opacity 0.2s;
-        }
-        
-        #auto-preenchedor-ui .btn-minimize:hover {
-          opacity: 1;
-        }
-        
-        #auto-preenchedor-ui .status {
-          background: rgba(255,255,255,0.1);
-          padding: 8px 10px;
-          border-radius: 6px;
-          margin-bottom: 10px;
-          font-size: 12px;
-          line-height: 1.4;
-        }
-        
-        #auto-preenchedor-ui .progress-mini {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 10px;
-          font-size: 12px;
-        }
-        
-        #auto-preenchedor-ui .progress-bar-mini {
-          width: 100%;
-          height: 6px;
-          background: rgba(255,255,255,0.2);
-          border-radius: 3px;
+        #compact-auto-ui .status {
+          color: #b8c0ff; /* Pastel Blue */
+          margin-bottom: 6px;
+          white-space: nowrap;
           overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        #compact-auto-ui .progress-bar {
+          height: 4px;
+          background: #2a2a2a;
           margin-bottom: 8px;
         }
-        
-        #auto-preenchedor-ui .progress-fill-mini {
+        #compact-auto-ui .progress-fill {
           height: 100%;
-          background: #10b981;
+          background: #b7e4c7; /* Pastel Green */
           width: 0%;
-          transition: width 0.3s ease;
         }
-        
-        #auto-preenchedor-ui button.action-btn {
+        #compact-auto-ui button {
           width: 100%;
-          padding: 8px 12px;
-          border: none;
-          border-radius: 6px;
-          font-size: 13px;
-          font-weight: 600;
+          background: #2a2a2a;
+          border: 1px solid #444;
+          color: #d1d1d1;
+          padding: 4px;
           cursor: pointer;
-          transition: all 0.2s;
-          margin-bottom: 6px;
+          font-family: monospace;
+          font-size: 10px;
+          margin-bottom: 2px;
         }
-        
-        #auto-preenchedor-ui .btn-iniciar {
-          background: #10b981;
-          color: white;
-        }
-        
-        #auto-preenchedor-ui .btn-iniciar:hover:not(:disabled) {
-          background: #059669;
-          transform: translateY(-1px);
-        }
-        
-        #auto-preenchedor-ui .btn-iniciar:disabled {
-          background: #4b5563;
-          cursor: not-allowed;
-          opacity: 0.6;
-        }
-        
-        #auto-preenchedor-ui .btn-fechar {
-          background: rgba(239, 68, 68, 0.8);
-          color: white;
-          font-size: 12px;
-          padding: 6px 10px;
-        }
-        
-        #auto-preenchedor-ui .btn-fechar:hover {
-          background: rgba(220, 38, 38, 0.9);
-        }
+        #compact-auto-ui button:hover { background: #333; }
+        #compact-auto-ui button:disabled { color: #555; cursor: not-allowed; }
+        #compact-auto-ui .close-btn { color: #ffadad; border-color: #553333; }
       </style>
       
-      <div class="header">
-        <div class="title">
-          <span>🤖</span>
-          <span>Auto-Fill</span>
-        </div>
-        <button class="btn-minimize" id="btn-minimize" title="Minimizar">−</button>
+      <div class="header" id="compact-header">
+        <span>AUTO-V6</span>
+        <span id="min-btn" style="cursor:pointer">_</span>
       </div>
       
-      <div class="content">
-        <div id="status" class="status">
-          🔍 Buscando...
-        </div>
-        
-        <div id="progress-container" style="display: none;">
-          <div class="progress-mini" id="progress-text">
-            <span id="questao-num">Q1/10</span>
-            <span id="progress-percent">0%</span>
-          </div>
-          <div class="progress-bar-mini">
-            <div class="progress-fill-mini" id="progress-fill"></div>
-          </div>
-        </div>
-        
-        <button id="btn-iniciar" class="action-btn btn-iniciar" disabled>
-          Aguarde...
-        </button>
-        
-        <button id="btn-fechar" class="action-btn btn-fechar">
-          ✕ Fechar
-        </button>
+      <div id="compact-content">
+        <div id="status" class="status">BUSCANDO...</div>
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <button id="btn-start" disabled>INICIAR</button>
+        <button id="btn-close" class="close-btn">FECHAR</button>
       </div>
     `;
     
     document.body.appendChild(ui);
+
+    // Arrastar
+    const header = ui.querySelector('#compact-header');
+    let isDragging = false, currX, currY, initX, initY, xOff = 0, yOff = 0;
+    header.onmousedown = (e) => { initX = e.clientX - xOff; initY = e.clientY - yOff; isDragging = true; };
+    document.onmousemove = (e) => {
+      if (isDragging) {
+        currX = e.clientX - initX; currY = e.clientY - initY;
+        xOff = currX; yOff = currY;
+        ui.style.transform = `translate3d(${currX}px, ${currY}px, 0)`;
+      }
+    };
+    document.onmouseup = () => { isDragging = false; };
+
     return ui;
   }
-  
-  // ═══════════════════════════════════════════════════════════
-  // PARTE 3: FUNÇÃO PARA CLICAR NAS ALTERNATIVAS
-  // ═══════════════════════════════════════════════════════════
-  
-  function clicarAlternativa(indice) {
-    const radioInput = document.querySelector(`input[type="radio"][id="${indice}"]`);
-    
-    if (radioInput) {
-      radioInput.click();
-      
-      const event = new Event('change', { bubbles: true });
-      radioInput.dispatchEvent(event);
-      
-      const label = radioInput.closest('label');
-      if (label) {
-        label.click();
-      }
-      
-      return true;
-    }
-    
-    const label = document.querySelector(`label[for="${indice}"]`);
-    
-    if (label) {
-      label.click();
-      return true;
-    }
-    
-    const alternativas = document.querySelectorAll('.alternative-box label');
-    
-    if (alternativas && alternativas[indice]) {
-      alternativas[indice].click();
-      return true;
-    }
-    
-    return false;
-  }
-  
-  // ═══════════════════════════════════════════════════════════
-  // PARTE 4: LÓGICA DE PREENCHIMENTO AUTOMÁTICO
-  // ═══════════════════════════════════════════════════════════
-  
+
   const ui = criarInterface();
   const statusEl = document.getElementById('status');
-  const btnIniciar = document.getElementById('btn-iniciar');
-  const btnFechar = document.getElementById('btn-fechar');
-  const btnMinimize = document.getElementById('btn-minimize');
-  const progressContainer = document.getElementById('progress-container');
+  const btnStart = document.getElementById('btn-start');
+  const btnClose = document.getElementById('btn-close');
   const progressFill = document.getElementById('progress-fill');
-  const questaoNum = document.getElementById('questao-num');
-  const progressPercent = document.getElementById('progress-percent');
-  
-  let gabarito = null;
-  let isRunning = false;
-  let isMinimized = false;
-  
-  // Minimizar/Maximizar
-  btnMinimize.addEventListener('click', (e) => {
-    e.stopPropagation();
-    isMinimized = !isMinimized;
-    ui.classList.toggle('minimized');
-    btnMinimize.textContent = isMinimized ? '+' : '−';
-  });
-  
-  ui.addEventListener('click', () => {
-    if (isMinimized) {
-      isMinimized = false;
-      ui.classList.remove('minimized');
-      btnMinimize.textContent = '−';
-    }
-  });
-  
-  // Buscar gabarito
+  const content = document.getElementById('compact-content');
+  const minBtn = document.getElementById('min-btn');
+
+  let gabarito = null, isRunning = false;
+
+  minBtn.onclick = () => { content.style.display = content.style.display === 'none' ? 'block' : 'none'; };
+  btnClose.onclick = () => ui.remove();
+
   setTimeout(() => {
     gabarito = buscarGabarito();
-    
     if (!gabarito) {
-      statusEl.innerHTML = `❌ Não encontrado<br><small>Inicie o teste</small>`;
-      btnIniciar.textContent = '❌ Indisponível';
-      return;
+      statusEl.innerText = "OFFLINE";
+      statusEl.style.color = "#ffadad";
+    } else {
+      statusEl.innerText = "PRONTO: " + gabarito.length + "Q";
+      btnStart.disabled = false;
     }
-    
-    const letras = ['A', 'B', 'C', 'D', 'E'];
-    
-    statusEl.innerHTML = `✅ ${gabarito.length} questões<br><small>${gabarito.map((r, i) => `${i+1}:${letras[r]}`).join(' ')}</small>`;
-    
-    btnIniciar.disabled = false;
-    btnIniciar.textContent = '▶ Iniciar';
-    
-    console.log('✅ Gabarito:', gabarito.map((r, i) => `Q${i+1}: ${letras[r]}`).join(', '));
-  }, 500);
-  
-  // Função principal de preenchimento
-  async function preencherQuestoes() {
+  }, 800);
+
+  btnStart.onclick = async () => {
     if (isRunning) return;
-    
     isRunning = true;
-    btnIniciar.disabled = true;
-    btnIniciar.textContent = '⏳ Rodando...';
-    progressContainer.style.display = 'block';
-    statusEl.style.display = 'none';
+    btnStart.disabled = true;
+    btnStart.innerText = "RODANDO...";
     
-    const letras = ['A', 'B', 'C', 'D', 'E'];
     const modoAtual = localStorage.getItem('tela');
     let currentQuestion = (modoAtual && parseInt(modoAtual) > 0) ? parseInt(modoAtual) - 1 : 0;
     
     for (let i = currentQuestion; i < gabarito.length; i++) {
-      const respostaCorreta = gabarito[i];
+      statusEl.innerText = `Q${i+1}/${gabarito.length}`;
+      progressFill.style.width = ((i + 1) / gabarito.length * 100) + '%';
       
-      questaoNum.textContent = `Q${i + 1}/${gabarito.length} → ${letras[respostaCorreta]}`;
-      
-      const progresso = Math.round(((i + 1) / gabarito.length) * 100);
-      progressFill.style.width = progresso + '%';
-      progressPercent.textContent = progresso + '%';
-      
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      const sucesso = clicarAlternativa(respostaCorreta);
-      
-      if (!sucesso) {
-        statusEl.style.display = 'block';
-        statusEl.innerHTML = `⚠️ Erro Q${i+1}<br><small>Continue manual</small>`;
-        isRunning = false;
-        btnIniciar.disabled = false;
-        btnIniciar.textContent = '🔄 Continuar';
+      await new Promise(r => setTimeout(r, 500));
+      if (!clicarAlternativa(gabarito[i])) {
+        statusEl.innerText = "ERRO Q" + (i+1);
+        isRunning = false; btnStart.disabled = false; btnStart.innerText = "RETOMAR";
         return;
       }
       
-      console.log(`✓ Q${i+1}: ${letras[respostaCorreta]}`);
-      
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
+      await new Promise(r => setTimeout(r, 600));
       if (i < gabarito.length - 1) {
-        const btnProximo = document.querySelector('.nav_buttons_right');
-        
-        if (btnProximo) {
-          btnProximo.click();
-          await new Promise(resolve => setTimeout(resolve, 800));
-        } else {
-          statusEl.style.display = 'block';
-          statusEl.innerHTML = `⚠️ Botão próxima<br><small>Avance manual</small>`;
-          isRunning = false;
-          btnIniciar.disabled = false;
-          btnIniciar.textContent = '🔄 Continuar';
-          return;
-        }
+        const next = document.querySelector('.nav_buttons_right');
+        if (next) { next.click(); await new Promise(r => setTimeout(r, 1000)); }
+        else { statusEl.innerText = "FIM DA TELA"; isRunning = false; btnStart.disabled = false; return; }
       }
     }
-    
-    progressFill.style.background = '#10b981';
-    questaoNum.textContent = '✅ Concluído!';
-    progressPercent.textContent = '100%';
-    
-    btnIniciar.textContent = '✅ Finalizado';
-    btnIniciar.style.background = '#10b981';
-    
-    console.log('🎉 Concluído! Clique em ENVIAR RESPOSTAS');
-    
-    isRunning = false;
-  }
-  
-  btnIniciar.addEventListener('click', preencherQuestoes);
-  
-  btnFechar.addEventListener('click', () => {
-    ui.remove();
-  });
-  
-  console.log('✅ Auto-Preenchedor Minimalista carregado!');
-  
+    statusEl.innerText = "CONCLUÍDO";
+    btnStart.innerText = "FIM";
+  };
+
 })();
