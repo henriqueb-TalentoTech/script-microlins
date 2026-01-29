@@ -1,3 +1,4 @@
+// auto-answer.js
 (function() {
   // ═══════════════════════════════════════════════════════════
   // PARTE 1: LÓGICA ORIGINAL (PRESERVADA)
