@@ -17,3 +17,9 @@ Na prática, **responde as perguntas sozinho** com 100% de acerto.
 
 A aula será marcada como concluída em poucos segundos.
 
+---
+
+## automatizer -- EM DESENVOLVIMENTO -- **Use o script no tampermonkey**
+Abra o Portal do Aluno e clique em "Iniciar" ele irá abrir e concluir todas as atividades.
+No momento o loop dele está falho e não roda de maneira totalmente automática,
+Precisando de intervenção para continuar rodando a cada item concluído.
