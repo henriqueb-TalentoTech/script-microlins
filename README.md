@@ -19,7 +19,15 @@ A aula será marcada como concluída em poucos segundos.
 
 ---
 
-## automatizer -- EM DESENVOLVIMENTO -- **Use o script no tampermonkey**
-Abra o Portal do Aluno e clique em "Iniciar" ele irá abrir e concluir todas as atividades.
-No momento o loop dele está falho e não roda de maneira totalmente automática,
-Precisando de intervenção para continuar rodando a cada item concluído.
+## automatizer
+Script para **Tampermonkey** que automatiza a conclusão de todas as atividades do Portal do Aluno Microlins.  
+Detecta e executa automaticamente cada tipo de atividade: teórico, mão na massa, pense e responda, questionamento e quiz (com gabarito automático).
+
+### Como usar
+1. Instale a extensão **Tampermonkey** no navegador
+2. Crie um novo script e cole o conteúdo do `automatizer.js`
+3. Salve e acesse o **Portal do Aluno** (portaldoaluno.microlins.com.br)
+4. Um painel **ML AUTO v5.0.0** aparecerá no canto inferior direito
+5. Clique em **INICIAR** — o script abrirá e concluirá todas as atividades automaticamente
+
+O script retoma de onde parou caso a página recarregue durante a execução.
