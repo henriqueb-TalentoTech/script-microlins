@@ -21,7 +21,7 @@ A aula será marcada como concluída em poucos segundos.
 
 ## automatizer
 Script para **Tampermonkey** que automatiza a conclusão de todas as atividades do Portal do Aluno Microlins.  
-Detecta e executa automaticamente cada tipo de atividade: teórico, mão na massa, pense e responda, questionamento e quiz (com gabarito automático).
+Detecta e executa automaticamente cada tipo de atividade: teórico, mão na massa, pense e responda, questionamento e teste seus conhecimentos (com gabarito automático).
 
 ### Como usar
 1. Instale a extensão **Tampermonkey** no navegador
