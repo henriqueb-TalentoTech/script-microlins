@@ -10,108 +10,49 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // ==/UserScript==
-// ==/UserScript==
 
 (function () {
   'use strict';
 
-  const isPopup = ['sistemas.microlins.com.br', 'appaula.microlins.com.br']
-    .includes(window.location.hostname);
+  // ─────────────────────────────────────────────────────────────
+  // 1. CONFIGURAÇÕES E ESTADO GLOBAL
+  // ─────────────────────────────────────────────────────────────
+
+  const isPopup = ['sistemas.microlins.com.br', 'appaula.microlins.com.br'].includes(
+    window.location.hostname
+  );
   const isMain = window.location.hostname === 'portaldoaluno.microlins.com.br';
 
-  // ── Desbloqueio de DevTools ───────────────────────────────────
-  window.addEventListener('contextmenu', (e) => e.stopImmediatePropagation(), true);
-  window.addEventListener('keydown', (e) => {
-    if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)))
-      e.stopImmediatePropagation();
-  }, true);
+  const TIPO_POR_TITULO = {
+    teórico: 'teorico',
+    'mão na massa': 'mao-na-massa',
+    'pense e responda': 'pense-responda',
+    questionamento: 'questionamento',
+    'teste seus conhecimentos': 'quiz',
+  };
 
-  // ── Suprime diálogos nativos e beforeunload nos popups ────────
-  // O "Sair do site?" é gerado pelo evento beforeunload da página.
-  // Interceptamos addEventListener ANTES de qualquer código da página
-  // para que o handler nunca seja registrado.
-  function neutralizarBeforeUnload() {
-    // Remove handler direto
-    window.onbeforeunload = null;
+  let pendingTipo = 'popup';
+  let resetPopup = () => {};
 
-    // Bloqueia registro futuro
-    const originalAdd = EventTarget.prototype.addEventListener;
+  // ─────────────────────────────────────────────────────────────
+  // 2. UTILITÁRIOS GERAIS
+  // ─────────────────────────────────────────────────────────────
 
-    EventTarget.prototype.addEventListener = function (type, listener, options) {
-      if (type === 'beforeunload' || type === 'unload') {
-        return;
-      }
-      return originalAdd.call(this, type, listener, options);
-    };
-
-    // Cancela qualquer evento já existente (fase capture)
-    window.addEventListener(
-      'beforeunload',
-      function (e) {
-        e.stopImmediatePropagation();
-      },
-      true
-    );
-
-    window.addEventListener(
-      'unload',
-      function (e) {
-        e.stopImmediatePropagation();
-      },
-      true
-    );
-
-    // Impede redefinição via propriedade
-    try {
-      Object.defineProperty(window, 'onbeforeunload', {
-        configurable: true,
-        get() {
-          return null;
-        },
-        set() {
-          return true;
-        },
-      });
-    } catch (_) {}
-
-    // Remove returnValue forçado
-    window.addEventListener(
-      'beforeunload',
-      (e) => {
-        delete e.returnValue;
-      },
-      true
-    );
-  }
-
-  if (isPopup) {
-    neutralizarBeforeUnload();
-  }
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-const log = (msg) => console.log('[ML]', msg);
-let pendingTipo = 'popup';
-let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
-
-
-  if (isPopup) onReady(initPopup);
-  else if (isMain) onReady(initMainPage);
+  const log = (msg) => console.log('[ML]', msg);
 
   function onReady(fn) {
     if (document.readyState !== 'loading') setTimeout(fn, 150);
     else document.addEventListener('DOMContentLoaded', () => setTimeout(fn, 150));
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // UTILITÁRIOS
-  // ─────────────────────────────────────────────────────────────
-
   function normalizarTexto(txt = '') {
-  return txt
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // remove acentos
-    .toLowerCase()
-    .trim();
-}
+    return txt
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
 
   function findBtn(...texts) {
     const els = [
@@ -136,49 +77,16 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
     return null;
   }
 
-  async function fecharEtapaFinalizada() {
-  log('Iniciando tentativa de fechar...');
+  async function esperarDOMEstavel(timeout = 8000) {
+    const inicio = Date.now();
+    let ultimoHTML = document.body.innerHTML;
 
-  // 1. Tenta encontrar um botão real primeiro
-  const btn = [...document.querySelectorAll('button, a, [role="button"]')].find((b) =>
-    /sair|fechar|close|etapa finalizada/i.test(b.textContent.trim())
-  );
-
-  if (btn) {
-    log('Clicando no botão de fechar: ' + btn.textContent.trim());
-    btn.click();
-    await delay(1000);
-  } else {
-    log('Nenhum botão encontrado, verificando apenas texto de conclusão...');
-  }
-
-  // 2. Independente de achar botão, se a URL for Encerramento ou o texto existir, fecha
-  log('Finalizando processo e fechando janela.');
-  neutralizarBeforeUnload();
-
-  await delay(500);
-  window.close();
-
-  // Backup caso o window.close() falhe (alguns navegadores bloqueiam)
-  setTimeout(() => {
-    if (!window.closed) window.location.href = "about:blank";
-  }, 1000);
-}
-
-  async function navegarAteOFim() {
-    let t = 0;
-    while (t++ < 60) {
-      const fim = findBtn('finalizar');
-      if (fim) {
-        fim.click();
-        log('finalizou');
+    while (Date.now() - inicio < timeout) {
+      await delay(600);
+      if (document.body.innerHTML === ultimoHTML) {
         return;
       }
-      const next = document.querySelector('.nav_buttons_right');
-      if (next) {
-        next.click();
-        await delay(800);
-      } else await delay(800);
+      ultimoHTML = document.body.innerHTML;
     }
   }
 
@@ -186,7 +94,6 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
     const end = Date.now() + timeout;
 
     while (Date.now() < end) {
-      // 1️⃣ overlay comum
       const overlay =
         document.querySelector('.loading') ||
         document.querySelector('.spinner') ||
@@ -194,25 +101,95 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
         document.querySelector('.swal2-container') ||
         document.querySelector('[aria-busy="true"]');
 
-      // 2️⃣ body bloqueado
       const bloqueado =
         document.body.style.pointerEvents === 'none' ||
         document.body.classList.contains('modal-open');
 
       if (!overlay && !bloqueado) {
-        await delay(600); // pequena margem pós-render
+        await delay(600);
         return;
       }
 
       await delay(400);
     }
-
     log('Tela demorou para desbloquear');
   }
 
+  async function esperarBotaoSumir(btn, timeout = 10000) {
+    const inicio = Date.now();
+    while (Date.now() - inicio < timeout) {
+      if (!document.body.contains(btn)) return;
+      await delay(600);
+    }
+  }
+
+  function existeProgressoIncompleto() {
+    return [...document.querySelectorAll('.card-body')]
+      .filter((cb) => !cb.querySelector('.badge.bg-danger.circulo'))
+      .some((cb) => {
+        const bar = cb.querySelector('.progress>.progress-bar');
+        return bar && parseFloat(bar.style.width || '0') < 100;
+      });
+  }
+
   // ─────────────────────────────────────────────────────────────
-  // SCORM SKIP
+  // 3. INTERCEPTAÇÕES, BLOQUEIOS E SCORM
   // ─────────────────────────────────────────────────────────────
+
+  window.addEventListener('contextmenu', (e) => e.stopImmediatePropagation(), true);
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)))
+        e.stopImmediatePropagation();
+    },
+    true
+  );
+
+  function neutralizarBeforeUnload() {
+    window.onbeforeunload = null;
+
+    const originalAdd = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function (type, listener, options) {
+      if (type === 'beforeunload' || type === 'unload') return;
+      return originalAdd.call(this, type, listener, options);
+    };
+
+    window.addEventListener(
+      'beforeunload',
+      function (e) {
+        e.stopImmediatePropagation();
+      },
+      true
+    );
+    window.addEventListener(
+      'unload',
+      function (e) {
+        e.stopImmediatePropagation();
+      },
+      true
+    );
+
+    try {
+      Object.defineProperty(window, 'onbeforeunload', {
+        configurable: true,
+        get() {
+          return null;
+        },
+        set() {
+          return true;
+        },
+      });
+    } catch (_) {}
+
+    window.addEventListener(
+      'beforeunload',
+      (e) => {
+        delete e.returnValue;
+      },
+      true
+    );
+  }
 
   function skipSCORM() {
     if (window.API) {
@@ -239,6 +216,7 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
       localStorage.setItem('cmi.core.lesson_status', 'Congratulations - completed');
       localStorage.setItem('cmi.core.lesson_location', 'Congratulations');
     } catch (_) {}
+
     [
       'telaFinalizacao',
       'telaFinalizacaoOther1',
@@ -247,8 +225,49 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
     ].forEach((id) => document.getElementById(id)?.click());
   }
 
+  async function fecharEtapaFinalizada() {
+    log('Iniciando tentativa de fechar...');
+    const btn = [...document.querySelectorAll('button, a, [role="button"]')].find((b) =>
+      /sair|fechar|close|etapa finalizada/i.test(b.textContent.trim())
+    );
+
+    if (btn) {
+      log('Clicando no botão de fechar: ' + btn.textContent.trim());
+      btn.click();
+      await delay(1000);
+    } else {
+      log('Nenhum botão encontrado, verificando apenas texto de conclusão...');
+    }
+
+    log('Finalizando processo e fechando janela.');
+    neutralizarBeforeUnload();
+    await delay(500);
+    window.close();
+
+    setTimeout(() => {
+      if (!window.closed) window.location.href = 'about:blank';
+    }, 1000);
+  }
+
+  async function navegarAteOFim() {
+    let t = 0;
+    while (t++ < 60) {
+      const fim = findBtn('finalizar');
+      if (fim) {
+        fim.click();
+        log('finalizou');
+        return;
+      }
+      const next = document.querySelector('.nav_buttons_right');
+      if (next) {
+        next.click();
+        await delay(800);
+      } else await delay(800);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
-  // AUTO-ANSWER
+  // 4. LÓGICA DE QUIZ (AUTO-ANSWER)
   // ─────────────────────────────────────────────────────────────
 
   function extrairGabarito() {
@@ -262,6 +281,7 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
       }
       return nodes;
     }
+
     function findRoot(el) {
       for (const k in el)
         if (
@@ -272,10 +292,12 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
           return el[k];
       return null;
     }
+
     const root = findRoot(document.querySelector('#root') || document.body);
     if (!root) return null;
     const nodes = walk(root._internalRoot || root.current || root);
     const cands = [];
+
     nodes.forEach((f) => {
       if (!f.memoizedState) return;
       let s = f.memoizedState;
@@ -292,6 +314,7 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
         s = s.next;
       }
     });
+
     if (!cands.length) return null;
     return cands.sort((a, b) => b.length - a.length)[0].map((r) => r - 1);
   }
@@ -318,101 +341,114 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
   }
 
   async function responderQuiz() {
-  const gabarito = extrairGabarito();
-  if (!gabarito) {
-    log('gabarito nao encontrado');
-    return false;
-  }
+    const gabarito = extrairGabarito();
+    if (!gabarito) {
+      log('gabarito nao encontrado');
+      return false;
+    }
 
-  log('quiz: ' + gabarito.length + 'Q');
+    log('quiz: ' + gabarito.length + 'Q');
 
-  for (let i = 0; i < gabarito.length; i++) {
-    log('respondendo Q' + (i + 1));
+    for (let i = 0; i < gabarito.length; i++) {
+      log('respondendo Q' + (i + 1));
 
-    const alternativasOk = await waitFor(
-      () => document.querySelectorAll('input[type="radio"]').length > 0,
+      const alternativasOk = await waitFor(
+        () => document.querySelectorAll('input[type="radio"]').length > 0,
+        10000
+      );
+      if (!alternativasOk) {
+        log('alternativas nao renderizaram Q' + (i + 1));
+        return false;
+      }
+
+      if (!clicarAlternativa(gabarito[i])) {
+        log('erro ao clicar Q' + (i + 1));
+        return false;
+      }
+
+      await delay(600);
+
+      if (i < gabarito.length - 1) {
+        const next = await waitFor(() => document.querySelector('.nav_buttons_right'), 8000);
+        if (!next) {
+          log('botao proximo nao encontrado Q' + (i + 1));
+          return false;
+        }
+        next.click();
+        await waitFor(() => document.querySelectorAll('input[type="radio"]').length > 0, 10000);
+        await delay(400);
+      }
+    }
+
+    log('avancando para tela de envio...');
+    const nextFinal = await waitFor(() => document.querySelector('.nav_buttons_right'), 6000);
+    if (nextFinal) {
+      nextFinal.click();
+      await delay(1000);
+    } else {
+      log('botao avancar para envio nao encontrado');
+    }
+
+    log('buscando botao finalizar...');
+    const finalizar = await waitFor(
+      () =>
+        [...document.querySelectorAll('button')].find((b) =>
+          /finalizar|enviar respostas/i.test(b.textContent.trim())
+        ),
       10000
     );
-    if (!alternativasOk) { log('alternativas nao renderizaram Q' + (i + 1)); return false; }
 
-    if (!clicarAlternativa(gabarito[i])) { log('erro ao clicar Q' + (i + 1)); return false; }
-
-    await delay(600);
-
-    if (i < gabarito.length - 1) {
-      const next = await waitFor(() => document.querySelector('.nav_buttons_right'), 8000);
-      if (!next) { log('botao proximo nao encontrado Q' + (i + 1)); return false; }
-      next.click();
-      await waitFor(() => document.querySelectorAll('input[type="radio"]').length > 0, 10000);
-      await delay(400);
+    if (!finalizar) {
+      log('botao finalizar nao encontrado');
+      return false;
     }
-  }
 
-  // ← Avança uma tela extra após a última questão para chegar no "Enviar Respostas"
-  log('avancando para tela de envio...');
-  const nextFinal = await waitFor(() => document.querySelector('.nav_buttons_right'), 6000);
-  if (nextFinal) {
-    nextFinal.click();
-    await delay(1000);
-  } else {
-    log('botao avancar para envio nao encontrado');
-  }
-
-  log('buscando botao finalizar...');
-  const finalizar = await waitFor(
-    () => [...document.querySelectorAll('button')].find((b) =>
-      /finalizar|enviar respostas/i.test(b.textContent.trim())
-    ),
-    10000
-  );
-
-  if (!finalizar) { log('botao finalizar nao encontrado'); return false; }
-
-  finalizar.click();
-  await delay(1500);
-
-  const confirmar = await waitFor(
-    () => [...document.querySelectorAll('button')].find((b) =>
-      /sim|confirmar|ok/i.test(b.textContent.trim())
-    ),
-    6000
-  );
-
-  if (confirmar) {
-    confirmar.click();
+    finalizar.click();
     await delay(1500);
+
+    const confirmar = await waitFor(
+      () =>
+        [...document.querySelectorAll('button')].find((b) =>
+          /sim|confirmar|ok/i.test(b.textContent.trim())
+        ),
+      6000
+    );
+
+    if (confirmar) {
+      confirmar.click();
+      await delay(1500);
+    }
+
+    log('quiz finalizado completamente');
+    return true;
   }
 
-  log('quiz finalizado completamente');
-  return true;
-}
-
-  // ═════════════════════════════════════════════════════════════
-  //  POPUP — fluxo por atividade
-  // ═════════════════════════════════════════════════════════════
+  // ─────────────────────────────────────────────────────────────
+  // 5. FLUXOS DE POPUP
+  // ─────────────────────────────────────────────────────────────
 
   async function initPopup() {
-  await delay(800);
+    neutralizarBeforeUnload();
+    await delay(800);
 
-  if (
-    window.location.pathname.includes('EncerramentoAula') ||
-    document.body.textContent.includes('Etapa finalizada')
-  ) {
-    await fecharEtapaFinalizada();
-    return;
+    if (
+      window.location.pathname.includes('EncerramentoAula') ||
+      document.body.textContent.includes('Etapa finalizada')
+    ) {
+      await fecharEtapaFinalizada();
+      return;
+    }
+
+    const tipo = GM_getValue('ml_tipo_atividade', 'popup');
+    log('Tipo recebido via GM_getValue: ' + tipo);
+
+    if (tipo === 'quiz') return await fluxoQuiz();
+    if (tipo === 'pense-responda') return await fluxoPenseResponda();
+    if (tipo === 'mao-na-massa') return await fluxoMaoNaMassa();
+    if (tipo === 'teorico') return await fluxoTeorico();
+
+    log('Tipo não mapeado: ' + tipo);
   }
-
-  const tipo = GM_getValue('ml_tipo_atividade', 'popup');
-  log('Tipo recebido via GM_getValue: ' + tipo);
-
-  if (tipo === 'quiz')           { await fluxoQuiz();          return; }
-  if (tipo === 'pense-responda') { await fluxoPenseResponda();  return; }
-  if (tipo === 'mao-na-massa')   { await fluxoMaoNaMassa();    return; }
-  if (tipo === 'teorico')        { await fluxoTeorico();        return; }
-
-  log('Tipo não mapeado: ' + tipo);
-}
-
 
   async function fluxoTeorico() {
     skipSCORM();
@@ -434,7 +470,6 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
   async function fluxoPenseResponda() {
     log('Fluxo Pense e Responda');
 
-    // espera botão FECHAR aparecer
     const btnFechar = await waitFor(
       () =>
         [...document.querySelectorAll('button')].find((b) => /fechar/i.test(b.textContent.trim())),
@@ -449,19 +484,12 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
       return;
     }
 
-    // aguarda redirecionamento para EncerramentoAula
     await waitFor(() => window.location.pathname.includes('EncerramentoAula'), 10000);
-
     await delay(1000);
-
-    // neutraliza beforeunload novamente por segurança
     neutralizarBeforeUnload();
 
     log('Encerramento após Pense e Responda');
-
-    // simula interação humana
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
     await delay(500);
 
     try {
@@ -481,23 +509,24 @@ let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
     await waitFor(() => document.querySelector('input[type="radio"]'), 8000);
     await delay(500);
 
-    const quizOk = await responderQuiz(); // já clica em finalizar + confirmar internamente
+    const quizOk = await responderQuiz();
     log('responderQuiz retornou: ' + quizOk);
 
-    // Aguarda tela de resultado/encerramento após confirmação
     await delay(2000);
     await fecharEtapaFinalizada();
   }
 
-  // ═════════════════════════════════════════════════════════════
-  //  PÁGINA PRINCIPAL
-  // ═════════════════════════════════════════════════════════════
+  // ─────────────────────────────────────────────────────────────
+  // 6. LÓGICA DA PÁGINA PRINCIPAL
+  // ─────────────────────────────────────────────────────────────
 
-function initMainPage() {
+  function initMainPage() {
     if (document.getElementById('ml-panel')) return;
 
     let currentPopup = null;
-    resetPopup = () => { currentPopup = null; };
+    resetPopup = () => {
+      currentPopup = null;
+    };
 
     const _open = window.open;
     window.open = function (...args) {
@@ -509,63 +538,35 @@ function initMainPage() {
       return currentPopup;
     };
 
-    document.head.insertAdjacentHTML('beforeend', `<style>
-      #ml-panel{position:fixed;bottom:20px;right:20px;background:#1e1e2e;color:#cdd6f4;
-        border:1px solid #45475a;border-radius:12px;padding:16px;width:210px;
-        font-family:'Courier New',monospace;font-size:12px;z-index:2147483647;
-        box-shadow:0 8px 32px rgba(0,0,0,.7);user-select:none;}
-      #ml-panel header{display:flex;justify-content:space-between;align-items:center;
-        margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #45475a;cursor:move;}
-      #ml-panel header b{color:#89b4fa;font-size:13px;}
-      #ml-panel header small{color:#6c7086;cursor:pointer;}
-      #ml-status{color:#a6e3a1;margin-bottom:8px;min-height:14px;word-break:break-word;line-height:1.4;}
-      #ml-bw{height:5px;background:#313244;border-radius:3px;margin-bottom:10px;}
-      #ml-bar{height:100%;background:#a6e3a1;border-radius:3px;width:0;transition:width .4s;}
-      #ml-panel button{width:100%;padding:7px 0;margin-top:5px;border:1px solid #45475a;
-        border-radius:6px;background:#313244;color:#cdd6f4;cursor:pointer;font-family:monospace;font-size:11px;}
-      #ml-panel button:hover:not(:disabled){background:#45475a;}
-      #ml-panel button:disabled{opacity:.35;cursor:not-allowed;}
-      #ml-start{background:#89b4fa!important;color:#1e1e2e!important;border-color:#89b4fa!important;font-weight:bold;}
-      #ml-stop{border-color:#f38ba8!important;color:#f38ba8!important;}
-    </style>`);
-
-    document.body.insertAdjacentHTML('beforeend', `
-      <div id="ml-panel">
-        <header id="ml-hdr"><b>ML AUTO v5.0.0</b><small id="ml-min">-</small></header>
-        <div id="ml-body">
-          <div id="ml-status">Pronto.</div>
-          <div id="ml-bw"><div id="ml-bar"></div></div>
-          <button id="ml-start">INICIAR</button>
-          <button id="ml-stop" style="display:none">PARAR</button>
-        </div>
-      </div>`);
-
-    const setSt = (m) => { const e = document.getElementById('ml-status'); if (e) e.textContent = m; };
-    const setPct = (p) => { const e = document.getElementById('ml-bar');    if (e) e.style.width = p + '%'; };
-
-    makeDraggable(document.getElementById('ml-panel'), document.getElementById('ml-hdr'));
-
-    document.getElementById('ml-min').onclick = () => {
-      const b = document.getElementById('ml-body');
-      const h = b.style.display === 'none';
-      b.style.display = h ? '' : 'none';
-      document.getElementById('ml-min').textContent = h ? '-' : '+';
-    };
+    injetarInterface();
 
     let running = false;
+    const setSt = (m) => {
+      const e = document.getElementById('ml-status');
+      if (e) e.textContent = m;
+    };
+    const setPct = (p) => {
+      const e = document.getElementById('ml-bar');
+      if (e) e.style.width = p + '%';
+    };
 
     async function iniciarExecucao() {
       if (running) return;
       running = true;
-      GM_setValue('ml_running', Date.now()); // timestamp de início
+      GM_setValue('ml_running', Date.now());
       document.getElementById('ml-start').disabled = true;
       document.getElementById('ml-stop').style.display = '';
       setPct(0);
 
-      await runAll(setSt, setPct, () => !running, () => currentPopup);
+      await runAll(
+        setSt,
+        setPct,
+        () => !running,
+        () => currentPopup
+      );
 
       running = false;
-      GM_setValue('ml_running', 0); // zera ao terminar
+      GM_setValue('ml_running', 0);
       document.getElementById('ml-start').disabled = false;
       document.getElementById('ml-stop').style.display = 'none';
     }
@@ -574,17 +575,14 @@ function initMainPage() {
 
     document.getElementById('ml-stop').onclick = () => {
       running = false;
-      GM_setValue('ml_running', 0); // zera ao parar
+      GM_setValue('ml_running', 0);
       setSt('Parado.');
       document.getElementById('ml-start').disabled = false;
       document.getElementById('ml-stop').style.display = 'none';
     };
 
-    // ── Retomada após reload ───────────────────────────────
-    // Só retoma se o heartbeat for recente (< 30s) — evita retomar
-    // após fechar e reabrir o navegador manualmente.
     const ultimoHeartbeat = GM_getValue('ml_running', 0);
-    const segundosAtras   = (Date.now() - ultimoHeartbeat) / 1000;
+    const segundosAtras = (Date.now() - ultimoHeartbeat) / 1000;
 
     if (ultimoHeartbeat > 0 && segundosAtras < 30) {
       log(`Retomando após reload (${segundosAtras.toFixed(1)}s atrás)...`);
@@ -593,83 +591,59 @@ function initMainPage() {
     }
   }
 
-
-  // ─────────────────────────────────────────────────────────────
-
   async function runAll(setSt, setPct, shouldStop, getPopup) {
     let totalExecutadas = 0;
     let tentativasVazio = 0;
     const MAX_TENTATIVAS_VAZIO = 5;
     const MAX_RETRIES_ATIVIDADE = 3;
 
-    // Recupera mapa de retries do storage (sobrevive reload)
     let retriesPorAtividade = {};
     try {
       retriesPorAtividade = JSON.parse(GM_getValue('ml_retries', '{}'));
-    } catch (_) { retriesPorAtividade = {}; }
+    } catch (_) {
+      retriesPorAtividade = {};
+    }
 
-    // Se havia popup em andamento antes do reload, aguarda ele fechar antes de começar
     const popupTituloEmAndamento = GM_getValue('ml_popup_titulo', '');
     const popupTs = GM_getValue('ml_popup_ts', 0);
-    const popupRecente = popupTs > 0 && (Date.now() - popupTs) < 300000;
+    const popupRecente = popupTs > 0 && Date.now() - popupTs < 300000;
 
     if (popupTituloEmAndamento && popupRecente) {
-  log(`Popup em andamento após reload: ${popupTituloEmAndamento} — aguardando...`);
-  setSt(`Aguardando popup: ${popupTituloEmAndamento}`);
+      log(`Popup em andamento após reload: ${popupTituloEmAndamento} — aguardando...`);
+      setSt(`Aguardando popup: ${popupTituloEmAndamento}`);
 
-  const inicio = Date.now();
-  while (Date.now() - inicio < 300000) {
-    await delay(2000);
-    await esperarDOMEstavel(5000);
+      const inicio = Date.now();
+      while (Date.now() - inicio < 300000) {
+        await delay(2000);
+        await esperarDOMEstavel(5000);
 
-    // Popup foi limpo pelo próprio fluxo = concluiu normalmente
-    if (!GM_getValue('ml_popup_titulo', '')) {
-      log('Popup concluiu normalmente.');
-      break;
+        if (!GM_getValue('ml_popup_titulo', '')) {
+          log('Popup concluiu normalmente.');
+          break;
+        }
+
+        const cardDoPopup = [...document.querySelectorAll('.card-body')].find((cb) => {
+          const b = cb.querySelector('button.btnAtividades.btn-info');
+          return b && b.getAttribute('title') === popupTituloEmAndamento;
+        });
+
+        if (!cardDoPopup) {
+          log('Card sumiu após reload — concluído.');
+          limparEstadoPopup(popupTituloEmAndamento, retriesPorAtividade);
+          break;
+        }
+
+        if (cardDoPopup.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo')) {
+          log('Badge no card correto — concluído.');
+          limparEstadoPopup(popupTituloEmAndamento, retriesPorAtividade);
+          break;
+        }
+
+        log('Card ainda pendente — popup provavelmente ainda aberto, aguardando...');
+      }
     }
-
-    // Procura o card CORRETO (mesmo título) e verifica se tem badge
-    const cardDoPopup = [...document.querySelectorAll('.card-body')].find((cb) => {
-      const b = cb.querySelector('button.btnAtividades.btn-info');
-      return b && b.getAttribute('title') === popupTituloEmAndamento;
-    });
-
-    if (!cardDoPopup) {
-      log('Card sumiu após reload — concluído.');
-      GM_setValue('ml_popup_titulo', '');
-      GM_setValue('ml_popup_ts', 0);
-      try {
-        const r = JSON.parse(GM_getValue('ml_retries', '{}'));
-        Object.keys(r).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete r[k]; });
-        GM_setValue('ml_retries', JSON.stringify(r));
-        // ← limpa também a variável local
-        Object.keys(retriesPorAtividade).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete retriesPorAtividade[k]; });
-      } catch (_) {}
-      break;
-    }
-
-    if (cardDoPopup.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo')) {
-      log('Badge no card correto — concluído.');
-      GM_setValue('ml_popup_titulo', '');
-      GM_setValue('ml_popup_ts', 0);
-      try {
-        const r = JSON.parse(GM_getValue('ml_retries', '{}'));
-        Object.keys(r).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete r[k]; });
-        GM_setValue('ml_retries', JSON.stringify(r));
-        // ← limpa também a variável local
-        Object.keys(retriesPorAtividade).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete retriesPorAtividade[k]; });
-      } catch (_) {}
-      break;
-    }
-
-
-    log('Card ainda pendente — popup provavelmente ainda aberto, aguardando...');
-  }
-}
 
     while (!shouldStop()) {
-
-      // ── 1. Aguarda cards ──────────────────────────────────
       const cards = [...document.querySelectorAll('.card-body')];
       if (cards.length === 0) {
         setSt('Aguardando carregamento...');
@@ -677,17 +651,14 @@ function initMainPage() {
         continue;
       }
 
-      // ── 2. Aguarda React estabilizar ──────────────────────
       await esperarDOMEstavel(6000);
 
-      // ── 3. Filtra pendentes ───────────────────────────────
       const atividadesPendentes = [...document.querySelectorAll('.card-body')].filter((cb) => {
         const concluido = cb.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo');
         if (concluido) return false;
         return !!cb.querySelector('button.btnAtividades.btn-info');
       });
 
-      // ── 4. Nada pendente ──────────────────────────────────
       if (atividadesPendentes.length === 0) {
         tentativasVazio++;
         setSt(`Verificando conclusão... (${tentativasVazio}/${MAX_TENTATIVAS_VAZIO})`);
@@ -718,11 +689,12 @@ function initMainPage() {
       const btn = atividadesPendentes[0].querySelector('button.btnAtividades.btn-info');
       if (!btn) continue;
 
-      const aulaNome      = atividadesPendentes[0].querySelector('h5.card-title')?.textContent.trim().slice(0, 20) || 'Aula';
+      const aulaNome =
+        atividadesPendentes[0].querySelector('h5.card-title')?.textContent.trim().slice(0, 20) ||
+        'Aula';
       const atividadeNome = btn.getAttribute('title') || 'Atividade';
-      const chave         = `${aulaNome}|${atividadeNome}`;
+      const chave = `${aulaNome}|${atividadeNome}`;
 
-      // ── 5. Limite de retries (persistido) ────────────────
       const tentativas = retriesPorAtividade[chave] || 0;
       if (tentativas >= MAX_RETRIES_ATIVIDADE) {
         log(`Pulando após ${tentativas} falhas: ${chave}`);
@@ -734,7 +706,7 @@ function initMainPage() {
       }
 
       retriesPorAtividade[chave] = tentativas + 1;
-      GM_setValue('ml_retries', JSON.stringify(retriesPorAtividade)); // persiste imediatamente
+      GM_setValue('ml_retries', JSON.stringify(retriesPorAtividade));
 
       totalExecutadas++;
       setSt(`Executando: ${aulaNome} › ${atividadeNome}`);
@@ -746,7 +718,6 @@ function initMainPage() {
       btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await delay(1000);
 
-      // ── 6. Executa ────────────────────────────────────────
       const resultado = await handlePopup(btn, getPopup);
       log(`Resultado de ${atividadeNome}: ${resultado}`);
 
@@ -764,29 +735,20 @@ function initMainPage() {
     }
   }
 
+  function getTipo(btn) {
+    const titulo = (btn.getAttribute('title') || '').toLowerCase().trim();
+    const tipo = TIPO_POR_TITULO[titulo];
 
-  const TIPO_POR_TITULO = {
-  'teórico': 'teorico',
-  'mão na massa': 'mao-na-massa',
-  'pense e responda': 'pense-responda',
-  'questionamento': 'questionamento',
-  'teste seus conhecimentos': 'quiz',
-};
+    if (!tipo) {
+      log(`Tipo desconhecido para title="${titulo}" — tratando como popup genérico`);
+      return 'popup';
+    }
 
-function getTipo(btn) {
-  const titulo = (btn.getAttribute('title') || '').toLowerCase().trim();
-  const tipo = TIPO_POR_TITULO[titulo];
-
-  if (!tipo) {
-    log(`Tipo desconhecido para title="${titulo}" — tratando como popup genérico`);
-    return 'popup';
+    log(`Tipo identificado: ${tipo}`);
+    return tipo;
   }
 
-  log(`Tipo identificado: ${tipo}`);
-  return tipo;
-}
-
-async function handlePopup(btn, getPopup) {
+  async function handlePopup(btn, getPopup) {
     const tipo = getTipo(btn);
     GM_setValue('ml_tipo_atividade', tipo);
     resetPopup();
@@ -798,8 +760,6 @@ async function handlePopup(btn, getPopup) {
       return 'concluida';
     }
 
-    // Persiste "popup em andamento" ANTES do click
-    // Se a página recarregar, o resume sabe que não deve clicar de novo
     GM_setValue('ml_popup_titulo', btn.getAttribute('title') || '');
     GM_setValue('ml_popup_ts', Date.now());
 
@@ -813,22 +773,19 @@ async function handlePopup(btn, getPopup) {
 
     const resultado = await waitAtividadeConcluida(card, btn, tipo === 'quiz' ? 300000 : 120000);
 
-    // Limpa estado ao concluir
     GM_setValue('ml_popup_titulo', '');
     GM_setValue('ml_popup_ts', 0);
 
     return resultado;
   }
 
-
-    async function waitAtividadeConcluida(cardEl, btn, timeout = 300000) {
+  async function waitAtividadeConcluida(cardEl, btn, timeout = 300000) {
     const end = Date.now() + timeout;
     const tituloAtividade = btn.getAttribute('title') || '';
 
     while (Date.now() < end) {
       await delay(1500);
 
-      // ── Card ainda no DOM ─────────────────────────────────
       if (document.body.contains(cardEl)) {
         const badge = cardEl.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo');
         if (badge) {
@@ -842,7 +799,6 @@ async function handlePopup(btn, getPopup) {
         continue;
       }
 
-      // ── Card saiu do DOM → página recarregou ─────────────
       log(`Reload detectado durante: ${tituloAtividade} — aguardando estabilizar...`);
       await delay(4000);
       await esperarDOMEstavel(8000);
@@ -862,11 +818,8 @@ async function handlePopup(btn, getPopup) {
         return 'concluida';
       }
 
-      // Card ainda pendente — continua monitorando com o card atualizado
-      // NÃO retorna 'pendente': o popup ainda pode estar aberto e rodando
       log(`Card ainda pendente após reload — continuando monitoramento: ${tituloAtividade}`);
-      cardEl = cardAtualizado; // atualiza referência para o novo DOM
-      // Continua o loop normalmente
+      cardEl = cardAtualizado;
     }
 
     log(`Timeout aguardando: ${tituloAtividade}`);
@@ -875,7 +828,6 @@ async function handlePopup(btn, getPopup) {
 
   async function handleQuestionamento(btn, getPopup) {
     log('Iniciando Questionamento');
-
     btn.click();
     await delay(1500);
 
@@ -892,10 +844,75 @@ async function handlePopup(btn, getPopup) {
 
     log('Clicando em Sim');
     btnSim.click();
-
     await delay(1500);
-
     log('Questionamento concluido');
+  }
+
+  function limparEstadoPopup(titulo, retriesLocais) {
+    GM_setValue('ml_popup_titulo', '');
+    GM_setValue('ml_popup_ts', 0);
+    try {
+      const r = JSON.parse(GM_getValue('ml_retries', '{}'));
+      Object.keys(r).forEach((k) => {
+        if (k.includes(titulo)) delete r[k];
+      });
+      GM_setValue('ml_retries', JSON.stringify(r));
+      Object.keys(retriesLocais).forEach((k) => {
+        if (k.includes(titulo)) delete retriesLocais[k];
+      });
+    } catch (_) {}
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 7. INJEÇÃO DE INTERFACE
+  // ─────────────────────────────────────────────────────────────
+
+  function injetarInterface() {
+    document.head.insertAdjacentHTML(
+      'beforeend',
+      `<style>
+      #ml-panel{position:fixed;bottom:20px;right:20px;background:#1e1e2e;color:#cdd6f4;
+        border:1px solid #45475a;border-radius:12px;padding:16px;width:210px;
+        font-family:'Courier New',monospace;font-size:12px;z-index:2147483647;
+        box-shadow:0 8px 32px rgba(0,0,0,.7);user-select:none;}
+      #ml-panel header{display:flex;justify-content:space-between;align-items:center;
+        margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #45475a;cursor:move;}
+      #ml-panel header b{color:#89b4fa;font-size:13px;}
+      #ml-panel header small{color:#6c7086;cursor:pointer;}
+      #ml-status{color:#a6e3a1;margin-bottom:8px;min-height:14px;word-break:break-word;line-height:1.4;}
+      #ml-bw{height:5px;background:#313244;border-radius:3px;margin-bottom:10px;}
+      #ml-bar{height:100%;background:#a6e3a1;border-radius:3px;width:0;transition:width .4s;}
+      #ml-panel button{width:100%;padding:7px 0;margin-top:5px;border:1px solid #45475a;
+        border-radius:6px;background:#313244;color:#cdd6f4;cursor:pointer;font-family:monospace;font-size:11px;}
+      #ml-panel button:hover:not(:disabled){background:#45475a;}
+      #ml-panel button:disabled{opacity:.35;cursor:not-allowed;}
+      #ml-start{background:#89b4fa!important;color:#1e1e2e!important;border-color:#89b4fa!important;font-weight:bold;}
+      #ml-stop{border-color:#f38ba8!important;color:#f38ba8!important;}
+    </style>`
+    );
+
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      `
+      <div id="ml-panel">
+        <header id="ml-hdr"><b>ML AUTO v5.0.0</b><small id="ml-min">-</small></header>
+        <div id="ml-body">
+          <div id="ml-status">Pronto.</div>
+          <div id="ml-bw"><div id="ml-bar"></div></div>
+          <button id="ml-start">INICIAR</button>
+          <button id="ml-stop" style="display:none">PARAR</button>
+        </div>
+      </div>`
+    );
+
+    makeDraggable(document.getElementById('ml-panel'), document.getElementById('ml-hdr'));
+
+    document.getElementById('ml-min').onclick = () => {
+      const b = document.getElementById('ml-body');
+      const h = b.style.display === 'none';
+      b.style.display = h ? '' : 'none';
+      document.getElementById('ml-min').textContent = h ? '-' : '+';
+    };
   }
 
   function makeDraggable(panel, handle) {
@@ -920,36 +937,10 @@ async function handlePopup(btn, getPopup) {
     };
   }
 
-  async function esperarDOMEstavel(timeout = 8000) {
-    const inicio = Date.now();
-    let ultimoHTML = document.body.innerHTML;
+  // ─────────────────────────────────────────────────────────────
+  // 8. INICIALIZAÇÃO
+  // ─────────────────────────────────────────────────────────────
 
-    while (Date.now() - inicio < timeout) {
-      await delay(600);
-      if (document.body.innerHTML === ultimoHTML) {
-        return;
-      }
-      ultimoHTML = document.body.innerHTML;
-    }
-  }
-
-  async function esperarBotaoSumir(btn, timeout = 10000) {
-    const inicio = Date.now();
-
-    while (Date.now() - inicio < timeout) {
-      if (!document.body.contains(btn)) {
-        return;
-      }
-      await delay(600);
-    }
-  }
-
-  function existeProgressoIncompleto() {
-    return [...document.querySelectorAll('.card-body')]
-      .filter((cb) => !cb.querySelector('.badge.bg-danger.circulo'))
-      .some((cb) => {
-        const bar = cb.querySelector('.progress>.progress-bar');
-        return bar && parseFloat(bar.style.width || '0') < 100;
-      });
-  }
+  if (isPopup) onReady(initPopup);
+  else if (isMain) onReady(initMainPage);
 })();
