@@ -1,33 +1,30 @@
 // ==UserScript==
 // @name         Microlins - Auto Concluir Aulas
 // @namespace    http://tampermonkey.net/
-// @version      4.4.0
+// @version      5.0.0
 // @description  Automatiza conclusão de todas as atividades no portal Microlins
 // @match        *://portaldoaluno.microlins.com.br/*
 // @match        *://sistemas.microlins.com.br/*
 // @match        *://appaula.microlins.com.br/*
-// @run-at       document-start
-// @grant        none
+// @run-at       document-idle
+// @grant        GM_setValue
+// @grant        GM_getValue
+// ==/UserScript==
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  const isPopup = ['sistemas.microlins.com.br', 'appaula.microlins.com.br'].includes(
-    window.location.hostname
-  );
+  const isPopup = ['sistemas.microlins.com.br', 'appaula.microlins.com.br']
+    .includes(window.location.hostname);
   const isMain = window.location.hostname === 'portaldoaluno.microlins.com.br';
 
   // ── Desbloqueio de DevTools ───────────────────────────────────
   window.addEventListener('contextmenu', (e) => e.stopImmediatePropagation(), true);
-  window.addEventListener(
-    'keydown',
-    (e) => {
-      if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)))
-        e.stopImmediatePropagation();
-    },
-    true
-  );
+  window.addEventListener('keydown', (e) => {
+    if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)))
+      e.stopImmediatePropagation();
+  }, true);
 
   // ── Suprime diálogos nativos e beforeunload nos popups ────────
   // O "Sair do site?" é gerado pelo evento beforeunload da página.
@@ -91,7 +88,10 @@
     neutralizarBeforeUnload();
   }
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-  const log = (msg) => console.log('[ML]', msg);
+const log = (msg) => console.log('[ML]', msg);
+let pendingTipo = 'popup';
+let resetPopup = () => {}; // ← declarado aqui, escopo global do IIFE
+
 
   if (isPopup) onReady(initPopup);
   else if (isMain) onReady(initMainPage);
@@ -318,146 +318,102 @@
   }
 
   async function responderQuiz() {
-    const gabarito = extrairGabarito();
-    if (!gabarito) {
-      log('gabarito nao encontrado');
-      return false;
-    }
+  const gabarito = extrairGabarito();
+  if (!gabarito) {
+    log('gabarito nao encontrado');
+    return false;
+  }
 
-    log('quiz: ' + gabarito.length + 'Q');
+  log('quiz: ' + gabarito.length + 'Q');
 
-    for (let i = 0; i < gabarito.length; i++) {
-      log('respondendo Q' + (i + 1));
+  for (let i = 0; i < gabarito.length; i++) {
+    log('respondendo Q' + (i + 1));
 
-      const alternativasOk = await waitFor(
-        () => document.querySelectorAll('input[type="radio"]').length > 0,
-        10000
-      );
-
-      if (!alternativasOk) {
-        log('alternativas nao renderizaram');
-        return false;
-      }
-
-      if (!clicarAlternativa(gabarito[i])) {
-        log('erro ao clicar Q' + (i + 1));
-        return false;
-      }
-
-      await delay(600);
-
-      const next = await waitFor(() => document.querySelector('.nav_buttons_right'), 8000);
-
-      if (!next) {
-        log('botao proximo nao encontrado');
-        return false;
-      }
-
-      next.click();
-      await delay(900);
-    }
-
-    // 🔹 FINALIZAR QUIZ
-
-    log('todas questoes respondidas');
-
-    const finalizar = await waitFor(
-      () =>
-        [...document.querySelectorAll('button')].find((b) =>
-          /finalizar|enviar respostas/i.test(b.textContent.trim())
-        ),
+    const alternativasOk = await waitFor(
+      () => document.querySelectorAll('input[type="radio"]').length > 0,
       10000
     );
-    if (finalizar) {
-      finalizar.click();
-      await delay(1500);
-    } else {
-      log('botao finalizar nao encontrado');
-      return false;
+    if (!alternativasOk) { log('alternativas nao renderizaram Q' + (i + 1)); return false; }
+
+    if (!clicarAlternativa(gabarito[i])) { log('erro ao clicar Q' + (i + 1)); return false; }
+
+    await delay(600);
+
+    if (i < gabarito.length - 1) {
+      const next = await waitFor(() => document.querySelector('.nav_buttons_right'), 8000);
+      if (!next) { log('botao proximo nao encontrado Q' + (i + 1)); return false; }
+      next.click();
+      await waitFor(() => document.querySelectorAll('input[type="radio"]').length > 0, 10000);
+      await delay(400);
     }
-
-    const confirmar = await waitFor(
-      () =>
-        [...document.querySelectorAll('button')].find((b) =>
-          /sim|confirmar|ok/i.test(b.textContent.trim())
-        ),
-      6000
-    );
-
-    if (confirmar) {
-      confirmar.click();
-      await delay(1500);
-    }
-
-    log('quiz finalizado completamente');
-    return true;
   }
+
+  // ← Avança uma tela extra após a última questão para chegar no "Enviar Respostas"
+  log('avancando para tela de envio...');
+  const nextFinal = await waitFor(() => document.querySelector('.nav_buttons_right'), 6000);
+  if (nextFinal) {
+    nextFinal.click();
+    await delay(1000);
+  } else {
+    log('botao avancar para envio nao encontrado');
+  }
+
+  log('buscando botao finalizar...');
+  const finalizar = await waitFor(
+    () => [...document.querySelectorAll('button')].find((b) =>
+      /finalizar|enviar respostas/i.test(b.textContent.trim())
+    ),
+    10000
+  );
+
+  if (!finalizar) { log('botao finalizar nao encontrado'); return false; }
+
+  finalizar.click();
+  await delay(1500);
+
+  const confirmar = await waitFor(
+    () => [...document.querySelectorAll('button')].find((b) =>
+      /sim|confirmar|ok/i.test(b.textContent.trim())
+    ),
+    6000
+  );
+
+  if (confirmar) {
+    confirmar.click();
+    await delay(1500);
+  }
+
+  log('quiz finalizado completamente');
+  return true;
+}
+
   // ═════════════════════════════════════════════════════════════
   //  POPUP — fluxo por atividade
   // ═════════════════════════════════════════════════════════════
 
   async function initPopup() {
   await delay(800);
-  log('popup host=' + window.location.hostname);
 
-  // Verificação específica para a URL de encerramento ou texto de finalização
-  if (window.location.pathname.includes('EncerramentoAula') ||
-      document.body.textContent.includes('Etapa finalizada')) {
-    log('Tela de encerramento detectada via URL/Texto');
+  if (
+    window.location.pathname.includes('EncerramentoAula') ||
+    document.body.textContent.includes('Etapa finalizada')
+  ) {
     await fecharEtapaFinalizada();
     return;
   }
 
-  // Se não for encerramento, tenta achar o título normal das atividades
-  const tituloEl = await waitFor(() => {
-    const el = document.querySelector('.course-name-title-tc, .course-name-title');
-    const btn = document.querySelector('button');
-    // Só prossegue se encontrar o título E o botão "Começar"
-    return (el && btn) ? el : null;
-  }, 15000);
+  const tipo = GM_getValue('ml_tipo_atividade', 'popup');
+  log('Tipo recebido via GM_getValue: ' + tipo);
 
-  if (!tituloEl) {
-    log('titulo nao encontrado');
-    return;
-  }
+  if (tipo === 'quiz')           { await fluxoQuiz();          return; }
+  if (tipo === 'pense-responda') { await fluxoPenseResponda();  return; }
+  if (tipo === 'mao-na-massa')   { await fluxoMaoNaMassa();    return; }
+  if (tipo === 'teorico')        { await fluxoTeorico();        return; }
 
-  const titulo = normalizarTexto(tituloEl.textContent);
-  log('Titulo normalizado: ' + titulo);
-
-  // 🔴 Encerramento
-  if (window.location.pathname.includes('EncerramentoAula')) {
-    log('Encerramento detectado');
-    neutralizarBeforeUnload();
-    await delay(500);
-    try { window.open('', '_self'); window.close(); } catch (_) {}
-    return;
-  }
-
-  // Agora as verificações vão funcionar corretamente:
-  if (titulo.includes('teste seus conhecimentos')) {
-    await fluxoQuiz();
-    return;
-  }
-
-  if (titulo.includes('pense e responda')) {
-    await fluxoPenseResponda();
-    return;
-  }
-
-  if (titulo.includes('mao na massa')) {
-    await fluxoMaoNaMassa();
-    return;
-  }
-
-  // 🟡 SCORM
-  if (window.API) {
-    log('Detectado SCORM');
-    await fluxoTeorico();
-    return;
-  }
-
-  log('Tipo não identificado');
+  log('Tipo não mapeado: ' + tipo);
 }
+
+
   async function fluxoTeorico() {
     skipSCORM();
     await delay(1500);
@@ -521,15 +477,15 @@
       comecar.click();
       await delay(1000);
     }
-    await waitFor(() => document.querySelector('input[type="radio"]'), 5000);
+
+    await waitFor(() => document.querySelector('input[type="radio"]'), 8000);
     await delay(500);
-    await responderQuiz();
-    await delay(500);
-    const fim = await waitFor(() => findBtn('finalizar'), 5000);
-    if (fim) {
-      fim.click();
-      await delay(600);
-    }
+
+    const quizOk = await responderQuiz(); // já clica em finalizar + confirmar internamente
+    log('responderQuiz retornou: ' + quizOk);
+
+    // Aguarda tela de resultado/encerramento após confirmação
+    await delay(2000);
     await fecharEtapaFinalizada();
   }
 
@@ -537,19 +493,23 @@
   //  PÁGINA PRINCIPAL
   // ═════════════════════════════════════════════════════════════
 
-  function initMainPage() {
+function initMainPage() {
     if (document.getElementById('ml-panel')) return;
 
     let currentPopup = null;
+    resetPopup = () => { currentPopup = null; };
+
     const _open = window.open;
     window.open = function (...args) {
+      if (args[0] && typeof args[0] === 'string') {
+        const sep = args[0].includes('?') ? '&' : '?';
+        args[0] = args[0] + sep + 'ml_tipo=' + encodeURIComponent(pendingTipo);
+      }
       currentPopup = _open.apply(this, args);
       return currentPopup;
     };
 
-    document.head.insertAdjacentHTML(
-      'beforeend',
-      `<style>
+    document.head.insertAdjacentHTML('beforeend', `<style>
       #ml-panel{position:fixed;bottom:20px;right:20px;background:#1e1e2e;color:#cdd6f4;
         border:1px solid #45475a;border-radius:12px;padding:16px;width:210px;
         font-family:'Courier New',monospace;font-size:12px;z-index:2147483647;
@@ -567,31 +527,21 @@
       #ml-panel button:disabled{opacity:.35;cursor:not-allowed;}
       #ml-start{background:#89b4fa!important;color:#1e1e2e!important;border-color:#89b4fa!important;font-weight:bold;}
       #ml-stop{border-color:#f38ba8!important;color:#f38ba8!important;}
-    </style>`
-    );
+    </style>`);
 
-    document.body.insertAdjacentHTML(
-      'beforeend',
-      `
+    document.body.insertAdjacentHTML('beforeend', `
       <div id="ml-panel">
-        <header id="ml-hdr"><b>ML AUTO v4.4</b><small id="ml-min">-</small></header>
+        <header id="ml-hdr"><b>ML AUTO v5.0.0</b><small id="ml-min">-</small></header>
         <div id="ml-body">
           <div id="ml-status">Pronto.</div>
           <div id="ml-bw"><div id="ml-bar"></div></div>
           <button id="ml-start">INICIAR</button>
           <button id="ml-stop" style="display:none">PARAR</button>
         </div>
-      </div>`
-    );
+      </div>`);
 
-    const setSt = (m) => {
-      const e = document.getElementById('ml-status');
-      if (e) e.textContent = m;
-    };
-    const setPct = (p) => {
-      const e = document.getElementById('ml-bar');
-      if (e) e.style.width = p + '%';
-    };
+    const setSt = (m) => { const e = document.getElementById('ml-status'); if (e) e.textContent = m; };
+    const setPct = (p) => { const e = document.getElementById('ml-bar');    if (e) e.style.width = p + '%'; };
 
     makeDraggable(document.getElementById('ml-panel'), document.getElementById('ml-hdr'));
 
@@ -603,189 +553,324 @@
     };
 
     let running = false;
-    document.getElementById('ml-start').onclick = async () => {
+
+    async function iniciarExecucao() {
       if (running) return;
       running = true;
+      GM_setValue('ml_running', Date.now()); // timestamp de início
       document.getElementById('ml-start').disabled = true;
       document.getElementById('ml-stop').style.display = '';
       setPct(0);
-      await runAll(
-        setSt,
-        setPct,
-        () => !running,
-        () => currentPopup
-      );
+
+      await runAll(setSt, setPct, () => !running, () => currentPopup);
+
       running = false;
+      GM_setValue('ml_running', 0); // zera ao terminar
+      document.getElementById('ml-start').disabled = false;
+      document.getElementById('ml-stop').style.display = 'none';
+    }
+
+    document.getElementById('ml-start').onclick = () => iniciarExecucao();
+
+    document.getElementById('ml-stop').onclick = () => {
+      running = false;
+      GM_setValue('ml_running', 0); // zera ao parar
+      setSt('Parado.');
       document.getElementById('ml-start').disabled = false;
       document.getElementById('ml-stop').style.display = 'none';
     };
-    document.getElementById('ml-stop').onclick = () => {
-      running = false;
-      setSt('Parado.');
-    };
+
+    // ── Retomada após reload ───────────────────────────────
+    // Só retoma se o heartbeat for recente (< 30s) — evita retomar
+    // após fechar e reabrir o navegador manualmente.
+    const ultimoHeartbeat = GM_getValue('ml_running', 0);
+    const segundosAtras   = (Date.now() - ultimoHeartbeat) / 1000;
+
+    if (ultimoHeartbeat > 0 && segundosAtras < 30) {
+      log(`Retomando após reload (${segundosAtras.toFixed(1)}s atrás)...`);
+      setSt('Retomando...');
+      setTimeout(() => iniciarExecucao(), 3000);
+    }
   }
+
+
+  // ─────────────────────────────────────────────────────────────
 
   async function runAll(setSt, setPct, shouldStop, getPopup) {
     let totalExecutadas = 0;
     let tentativasVazio = 0;
+    const MAX_TENTATIVAS_VAZIO = 5;
+    const MAX_RETRIES_ATIVIDADE = 3;
+
+    // Recupera mapa de retries do storage (sobrevive reload)
+    let retriesPorAtividade = {};
+    try {
+      retriesPorAtividade = JSON.parse(GM_getValue('ml_retries', '{}'));
+    } catch (_) { retriesPorAtividade = {}; }
+
+    // Se havia popup em andamento antes do reload, aguarda ele fechar antes de começar
+    const popupTituloEmAndamento = GM_getValue('ml_popup_titulo', '');
+    const popupTs = GM_getValue('ml_popup_ts', 0);
+    const popupRecente = popupTs > 0 && (Date.now() - popupTs) < 300000;
+
+    if (popupTituloEmAndamento && popupRecente) {
+  log(`Popup em andamento após reload: ${popupTituloEmAndamento} — aguardando...`);
+  setSt(`Aguardando popup: ${popupTituloEmAndamento}`);
+
+  const inicio = Date.now();
+  while (Date.now() - inicio < 300000) {
+    await delay(2000);
+    await esperarDOMEstavel(5000);
+
+    // Popup foi limpo pelo próprio fluxo = concluiu normalmente
+    if (!GM_getValue('ml_popup_titulo', '')) {
+      log('Popup concluiu normalmente.');
+      break;
+    }
+
+    // Procura o card CORRETO (mesmo título) e verifica se tem badge
+    const cardDoPopup = [...document.querySelectorAll('.card-body')].find((cb) => {
+      const b = cb.querySelector('button.btnAtividades.btn-info');
+      return b && b.getAttribute('title') === popupTituloEmAndamento;
+    });
+
+    if (!cardDoPopup) {
+      log('Card sumiu após reload — concluído.');
+      GM_setValue('ml_popup_titulo', '');
+      GM_setValue('ml_popup_ts', 0);
+      try {
+        const r = JSON.parse(GM_getValue('ml_retries', '{}'));
+        Object.keys(r).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete r[k]; });
+        GM_setValue('ml_retries', JSON.stringify(r));
+        // ← limpa também a variável local
+        Object.keys(retriesPorAtividade).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete retriesPorAtividade[k]; });
+      } catch (_) {}
+      break;
+    }
+
+    if (cardDoPopup.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo')) {
+      log('Badge no card correto — concluído.');
+      GM_setValue('ml_popup_titulo', '');
+      GM_setValue('ml_popup_ts', 0);
+      try {
+        const r = JSON.parse(GM_getValue('ml_retries', '{}'));
+        Object.keys(r).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete r[k]; });
+        GM_setValue('ml_retries', JSON.stringify(r));
+        // ← limpa também a variável local
+        Object.keys(retriesPorAtividade).forEach(k => { if (k.includes(popupTituloEmAndamento)) delete retriesPorAtividade[k]; });
+      } catch (_) {}
+      break;
+    }
+
+
+    log('Card ainda pendente — popup provavelmente ainda aberto, aguardando...');
+  }
+}
 
     while (!shouldStop()) {
-      await delay(2000); // Aumentado para dar tempo ao portal
 
-      // 1️⃣ Verifica se os cards existem (evita parar enquanto a página carrega)
+      // ── 1. Aguarda cards ──────────────────────────────────
       const cards = [...document.querySelectorAll('.card-body')];
-
       if (cards.length === 0) {
         setSt('Aguardando carregamento...');
         await delay(2000);
         continue;
       }
 
-      // 2️⃣ Filtra atividades pendentes
-      const atividadesPendentes = cards.filter((cb) => {
-        // Verifica se tem o selo vermelho de concluído
+      // ── 2. Aguarda React estabilizar ──────────────────────
+      await esperarDOMEstavel(6000);
+
+      // ── 3. Filtra pendentes ───────────────────────────────
+      const atividadesPendentes = [...document.querySelectorAll('.card-body')].filter((cb) => {
         const concluido = cb.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo');
         if (concluido) return false;
-
-        // Verifica se tem o botão de iniciar
-        const btn = cb.querySelector('button.btnAtividades.btn-info');
-        return !!btn;
+        return !!cb.querySelector('button.btnAtividades.btn-info');
       });
 
-      // 3️⃣ Lógica de Finalização Real
+      // ── 4. Nada pendente ──────────────────────────────────
       if (atividadesPendentes.length === 0) {
         tentativasVazio++;
-        setSt(`Verificando conclusão... (${tentativasVazio}/3)`);
-
+        setSt(`Verificando conclusão... (${tentativasVazio}/${MAX_TENTATIVAS_VAZIO})`);
+        log(`Nenhuma pendente — tentativa ${tentativasVazio}/${MAX_TENTATIVAS_VAZIO}`);
         await delay(3000);
 
-        if (tentativasVazio >= 3) {
-          // Se realmente não tiver nada, tenta dar um scroll para o topo para ver se algo carrega
-          window.scrollTo(0, 0);
-          await delay(2000);
+        if (tentativasVazio < MAX_TENTATIVAS_VAZIO) continue;
 
-          // Re-checa uma última vez
-          const checkFinal = document.querySelector('button.btnAtividades.btn-info');
-          if (!checkFinal) {
-            setSt('Tudo concluído!');
-            setPct(100);
-            break;
-          }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        await delay(2000);
+        await esperarDOMEstavel(5000);
+
+        if (!document.querySelector('button.btnAtividades.btn-info')) {
+          setSt('✅ Tudo concluído!');
+          setPct(100);
+          GM_setValue('ml_running', 0);
+          GM_setValue('ml_retries', '{}');
+          log('Concluído. Encerrando.');
+          break;
         }
+
+        tentativasVazio = 0;
         continue;
       }
 
-      // Reset de tentativas se achou algo
       tentativasVazio = 0;
 
-      // 4️⃣ Execução da Atividade
       const btn = atividadesPendentes[0].querySelector('button.btnAtividades.btn-info');
       if (!btn) continue;
 
-      totalExecutadas++;
-      const aulaNome = atividadesPendentes[0].querySelector('h5.card-title')?.textContent.trim().slice(0, 20) || 'Aula';
+      const aulaNome      = atividadesPendentes[0].querySelector('h5.card-title')?.textContent.trim().slice(0, 20) || 'Aula';
       const atividadeNome = btn.getAttribute('title') || 'Atividade';
+      const chave         = `${aulaNome}|${atividadeNome}`;
 
-      setSt(`Executando: ${aulaNome} > ${atividadeNome}`);
+      // ── 5. Limite de retries (persistido) ────────────────
+      const tentativas = retriesPorAtividade[chave] || 0;
+      if (tentativas >= MAX_RETRIES_ATIVIDADE) {
+        log(`Pulando após ${tentativas} falhas: ${chave}`);
+        setSt(`Pulando: ${atividadeNome}`);
+        retriesPorAtividade[chave] = MAX_RETRIES_ATIVIDADE + 99;
+        GM_setValue('ml_retries', JSON.stringify(retriesPorAtividade));
+        await delay(2000);
+        continue;
+      }
+
+      retriesPorAtividade[chave] = tentativas + 1;
+      GM_setValue('ml_retries', JSON.stringify(retriesPorAtividade)); // persiste imediatamente
+
+      totalExecutadas++;
+      setSt(`Executando: ${aulaNome} › ${atividadeNome}`);
       setPct(Math.min(totalExecutadas * 7, 98));
+      log(`Iniciando (tentativa ${tentativas + 1}): ${aulaNome} › ${atividadeNome}`);
+
+      GM_setValue('ml_running', Date.now());
 
       btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await delay(1000);
 
-      // Dispara o popup
-      await handlePopup(btn, getPopup);
+      // ── 6. Executa ────────────────────────────────────────
+      const resultado = await handlePopup(btn, getPopup);
+      log(`Resultado de ${atividadeNome}: ${resultado}`);
 
-      // 5️⃣ Pós-Popup: O segredo da estabilidade
-      log('Popup fechado, aguardando portal atualizar...');
-      setSt('Aguardando portal atualizar...');
-
-      // Espera o bloqueio de tela (loading) sumir
-      await esperarTelaDesbloquear(15000);
-
-      // Espera o DOM estabilizar (o React redesenhar os badges)
-      await esperarDOMEstavel(5000);
-
-      await delay(2000); // Margem de segurança final
-    }
-  }
-
-  function getTipo(btn) {
-  const card = btn.closest('.card-body');
-  if (!card) return 'popup';
-
-  // 🔎 Pega o nome oficial buscando pelas duas classes possíveis
-  const nomeAtividade =
-    card.querySelector('.course-name-title-tc')?.textContent ||
-    card.querySelector('.course-name-title')?.textContent ||
-    btn.getAttribute('title') ||
-    '';
-
-  const titulo = normalizarTexto(nomeAtividade);
-  log('Identificando tipo para: ' + titulo);
-
-  if (titulo.includes('teste seus conhecimentos')) return 'quiz';
-  if (titulo.includes('questionamento')) return 'questionamento';
-  if (titulo.includes('pense e responda')) return 'pense-responda';
-  if (titulo.includes('mao na massa')) return 'mao-na-massa';
-  if (titulo.includes('teorico')) return 'teorico';
-
-  return 'popup';
-}
-
-  async function handlePopup(btn, getPopup) {
-    const tipo = getTipo(btn);
-
-    // 🔵 QUESTIONAMENTO (SweetAlert "Sim")
-    if (tipo === 'questionamento') {
-      await handleQuestionamento(btn, getPopup);
-      return;
-    }
-
-    // 🟢 MÃO NA MASSA
-    if (tipo === 'mao-na-massa') {
-      btn.click();
-      const webBtn = await waitFor(() => document.querySelector('#btnWebAtividades'), 6000);
-      if (webBtn) webBtn.click();
-
-      await waitPopupClose(getPopup, 120000);
-      return;
-    }
-
-    // 🔵 QUIZ
-    if (tipo === 'quiz') {
-      btn.click();
-      await delay(1500);
-      await waitPopupClose(getPopup, 180000);
-      return;
-    }
-
-    // 🟡 padrão
-    btn.click();
-    await delay(1800);
-    await waitPopupClose(getPopup, 120000);
-  }
-
-  async function waitPopupClose(getPopup, timeout = 300000) {
-    const end = Date.now() + timeout;
-    log('Aguardando fechamento da atividade...');
-
-    while (Date.now() < end) {
-      await delay(1000);
-      const p = getPopup();
-
-      // Verifica se a janela foi fechada ou se perdeu o acesso a ela
-      try {
-        if (!p || p.closed) {
-          log('Popup detectado como fechado.');
-          return true;
-        }
-      } catch (e) {
-        log('Erro ao acessar popup (provavelmente fechado/redirecionado).');
-        return true;
+      if (resultado === 'concluida') {
+        delete retriesPorAtividade[chave];
+        GM_setValue('ml_retries', JSON.stringify(retriesPorAtividade));
+        setSt('Aguardando portal atualizar...');
+        await esperarTelaDesbloquear(15000);
+        await esperarDOMEstavel(6000);
+        await delay(2000);
+      } else {
+        setSt(`Aguardando nova tentativa: ${atividadeNome}`);
+        await delay(3000);
       }
     }
-    log('Timeout atingido ao esperar popup.');
-    return false;
+  }
+
+
+  const TIPO_POR_TITULO = {
+  'teórico': 'teorico',
+  'mão na massa': 'mao-na-massa',
+  'pense e responda': 'pense-responda',
+  'questionamento': 'questionamento',
+  'teste seus conhecimentos': 'quiz',
+};
+
+function getTipo(btn) {
+  const titulo = (btn.getAttribute('title') || '').toLowerCase().trim();
+  const tipo = TIPO_POR_TITULO[titulo];
+
+  if (!tipo) {
+    log(`Tipo desconhecido para title="${titulo}" — tratando como popup genérico`);
+    return 'popup';
+  }
+
+  log(`Tipo identificado: ${tipo}`);
+  return tipo;
+}
+
+async function handlePopup(btn, getPopup) {
+    const tipo = getTipo(btn);
+    GM_setValue('ml_tipo_atividade', tipo);
+    resetPopup();
+
+    const card = btn.closest('.card-body');
+
+    if (tipo === 'questionamento') {
+      await handleQuestionamento(btn, getPopup);
+      return 'concluida';
+    }
+
+    // Persiste "popup em andamento" ANTES do click
+    // Se a página recarregar, o resume sabe que não deve clicar de novo
+    GM_setValue('ml_popup_titulo', btn.getAttribute('title') || '');
+    GM_setValue('ml_popup_ts', Date.now());
+
+    btn.click();
+    await delay(500);
+
+    if (tipo === 'mao-na-massa') {
+      const webBtn = await waitFor(() => document.querySelector('#btnWebAtividades'), 6000);
+      if (webBtn) webBtn.click();
+    }
+
+    const resultado = await waitAtividadeConcluida(card, btn, tipo === 'quiz' ? 300000 : 120000);
+
+    // Limpa estado ao concluir
+    GM_setValue('ml_popup_titulo', '');
+    GM_setValue('ml_popup_ts', 0);
+
+    return resultado;
+  }
+
+
+    async function waitAtividadeConcluida(cardEl, btn, timeout = 300000) {
+    const end = Date.now() + timeout;
+    const tituloAtividade = btn.getAttribute('title') || '';
+
+    while (Date.now() < end) {
+      await delay(1500);
+
+      // ── Card ainda no DOM ─────────────────────────────────
+      if (document.body.contains(cardEl)) {
+        const badge = cardEl.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo');
+        if (badge) {
+          log(`Badge detectado — concluída: ${tituloAtividade}`);
+          return 'concluida';
+        }
+        if (!cardEl.querySelector('button.btnAtividades.btn-info')) {
+          log(`Botão sumiu — concluída: ${tituloAtividade}`);
+          return 'concluida';
+        }
+        continue;
+      }
+
+      // ── Card saiu do DOM → página recarregou ─────────────
+      log(`Reload detectado durante: ${tituloAtividade} — aguardando estabilizar...`);
+      await delay(4000);
+      await esperarDOMEstavel(8000);
+
+      const cardAtualizado = [...document.querySelectorAll('.card-body')].find((cb) => {
+        const b = cb.querySelector('button.btnAtividades.btn-info');
+        return b && b.getAttribute('title') === tituloAtividade;
+      });
+
+      if (!cardAtualizado) {
+        log(`Card não encontrado após reload — concluída: ${tituloAtividade}`);
+        return 'concluida';
+      }
+
+      if (cardAtualizado.querySelector('.badge.bg-danger.circulo, .badge.bg-success.circulo')) {
+        log(`Badge após reload — concluída: ${tituloAtividade}`);
+        return 'concluida';
+      }
+
+      // Card ainda pendente — continua monitorando com o card atualizado
+      // NÃO retorna 'pendente': o popup ainda pode estar aberto e rodando
+      log(`Card ainda pendente após reload — continuando monitoramento: ${tituloAtividade}`);
+      cardEl = cardAtualizado; // atualiza referência para o novo DOM
+      // Continua o loop normalmente
+    }
+
+    log(`Timeout aguardando: ${tituloAtividade}`);
+    return 'timeout';
   }
 
   async function handleQuestionamento(btn, getPopup) {
