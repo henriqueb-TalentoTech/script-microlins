@@ -1,0 +1,24 @@
+{
+    "permissions": {
+      "allow": [
+        "Bash(uv run:*)",
+        "mcp__ide__getDiagnostics",
+        "Bash(npm install:*)",
+        "Bash(npm audit:*)",
+        "Bash(uv sync:*)",
+        "Bash(Bash --command 'cd C:/dev/editor-pdf && uv sync 2>&1' --description 'Install backend dependencies' --timeout 60000 --working-dir 'C:\\\\dev\\\\editor-pdf')",
+        "Bash(uv add:*)",
+        "Bash(curl:*)",
+        "Bash(npm run:*)",
+        "WebFetch(domain:cdnjs.com)",
+        "Bash(lsof -ti:8001)",
+        "Bash(xargs taskkill:*)",
+        "Bash(lsof -ti:8000)",
+        "Bash(git*)",
+        "Bash(npx vite:*)",
+        "Bash(npx tsc:*)",
+        "WebFetch(domain:smallpdf.com)",
+        "WebSearch"
+      ]
+    }
+  }
