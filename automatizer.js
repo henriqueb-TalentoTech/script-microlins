@@ -199,7 +199,7 @@ let resetPopup = () => {};
       const next = document.querySelector('.nav_buttons_right');
       if (next) {
         next.click();
-        await delay(800);
+        await delay(200);
       } else await delay(800);
     }
   }
@@ -392,14 +392,37 @@ function detectarTipoPeloDOM() {
 
 
   async function fluxoTeorico() {
+    log('fluxoTeorico: aguardando SCORM API carregar...');
+    const scormReady = await waitFor(() => window.API, 15000);
+    if (!scormReady) log('SCORM API não carregou, tentando mesmo assim...');
+    else log('SCORM API detectado!');
     skipSCORM();
-    await delay(1500);
-    await fecharEtapaFinalizada();
+    log('fluxoTeorico: aguardando tela "Etapa finalizada"...');
+    const tela = await waitFor(
+      () => [...document.querySelectorAll('h1,h2,h3,h4,h5,.title,strong.text-success,.swal2-title')]
+        .find(el => el.textContent.includes('Etapa finalizada')),
+      30000
+    );
+    if (tela) {
+      log('Tela detectada, aguardando 3s antes de fechar...');
+      await delay(3000);
+      await fecharEtapaFinalizada();
+    } else {
+      log('Tela não apareceu, fechando mesmo assim...');
+      await fecharEtapaFinalizada();
+    }
   }
 
   async function fluxoMaoNaMassa() {
     const comecar = await waitFor(() => findBtn('começar', 'comecar', 'iniciar'), 8000);
     if (comecar) { log('comecar'); comecar.click(); await delay(1000); }
+
+    // Aguarda a página do popup carregar completamente após clicar em "Começar"
+    // Evita concorrência: não procura "finalizar" até que a tela esteja estável
+    await esperarTelaDesbloquear(6000);
+    await esperarDOMEstavel(3000);
+    await delay(1000); // Garante que todos os elementos estejam renderizados
+
     await navegarAteOFim();
     await fecharEtapaFinalizada();
   }
