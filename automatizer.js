@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Microlins - Auto Concluir Aulas
 // @namespace    http://tampermonkey.net/
-// @version      5.0.0
+// @version      5.1.0
 // @description  Automatiza conclusão de todas as atividades no portal Microlins
 // @match        *://portaldoaluno.microlins.com.br/*
 // @match        *://sistemas.microlins.com.br/*

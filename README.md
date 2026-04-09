@@ -27,7 +27,7 @@ Detecta e executa automaticamente cada tipo de atividade: teórico, mão na mass
 1. Instale a extensão **Tampermonkey** no navegador
 2. Crie um novo script e cole o conteúdo do `automatizer.js`
 3. Salve e acesse o **Portal do Aluno** (portaldoaluno.microlins.com.br)
-4. Um painel **ML AUTO v5.0.0** aparecerá no canto inferior direito
+4. Um painel **ML AUTO v5.1.0** aparecerá no canto inferior direito
 5. Clique em **INICIAR** — o script abrirá e concluirá todas as atividades automaticamente
 
 O script retoma de onde parou caso a página recarregue durante a execução.
