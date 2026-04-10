@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Microlins - Auto Concluir Aulas
 // @namespace    http://tampermonkey.net/
-// @version      5.1.0
+// @version      5.0.0
 // @description  Automatiza conclusão de todas as atividades no portal Microlins
 // @match        *://portaldoaluno.microlins.com.br/*
 // @match        *://sistemas.microlins.com.br/*
@@ -155,6 +155,17 @@ let resetPopup = () => {};
     }
     log('Tela demorou para desbloquear');
   }
+
+
+
+   async function dispensarModalContinuar() {
+  const btn = await waitFor(
+    () => [...document.querySelectorAll('button, .swal2-deny, .swal2-cancel')]
+      .find((b) => /não|nao/i.test(b.textContent.trim())),
+    5000
+  );
+  if (btn) { log('Modal "continuar de onde parou" — clicando em Não'); btn.click(); await delay(500); }
+}
 
   // ─────────────────────────────────────────────────────────────
   // 5. NAVEGAÇÃO E CONCLUSÃO DE TELA
@@ -392,6 +403,8 @@ function detectarTipoPeloDOM() {
 
 
   async function fluxoTeorico() {
+  await dispensarModalContinuar(); // ← adicionar
+
     log('fluxoTeorico: aguardando SCORM API carregar...');
     const scormReady = await waitFor(() => window.API, 15000);
     if (!scormReady) log('SCORM API não carregou, tentando mesmo assim...');
@@ -413,15 +426,18 @@ function detectarTipoPeloDOM() {
     }
   }
 
-  async function fluxoMaoNaMassa() {
+
+async function fluxoMaoNaMassa() {
+  await dispensarModalContinuar(); // ← adicionar
+
     const comecar = await waitFor(() => findBtn('começar', 'comecar', 'iniciar'), 8000);
     if (comecar) { log('comecar'); comecar.click(); await delay(1000); }
 
     // Aguarda a página do popup carregar completamente após clicar em "Começar"
     // Evita concorrência: não procura "finalizar" até que a tela esteja estável
-    await esperarTelaDesbloquear(6000);
-    await esperarDOMEstavel(3000);
-    await delay(1000); // Garante que todos os elementos estejam renderizados
+    await esperarTelaDesbloquear(2000);
+    await esperarDOMEstavel(2000);
+    await delay(500); // Garante que todos os elementos estejam renderizados
 
     await navegarAteOFim();
     await fecharEtapaFinalizada();
@@ -497,12 +513,15 @@ function detectarTipoPeloDOM() {
   }
 
   const TIPO_POR_TITULO = {
-    'teórico': 'teorico',
-    'mão na massa': 'mao-na-massa',
-    'pense e responda': 'pense-responda',
-    'questionamento': 'questionamento',
-    'testes seus conhecimentos': 'quiz',
-  };
+  'teórico': 'teorico',
+   'teórica': 'teorico',
+  'mão na massa': 'mao-na-massa',
+  'pense e responda': 'pense-responda',
+  'pensa e responda': 'pense-responda',  // ← alias para o typo dessa disciplina
+  'questionamento': 'questionamento',
+  'testes seus conhecimentos': 'quiz',
+  'teste seus conhecimentos': 'quiz',
+};
 
   function getTipo(btn) {
     const titulo = (btn.getAttribute('title') || '').toLowerCase().trim();
