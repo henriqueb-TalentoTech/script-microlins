@@ -25,11 +25,11 @@
   const isPopup = isPopupDomain || (!isDashboard && window.location.hostname === 'portaldoaluno.microlins.com.br' && !currentUrl.includes('/login'));
 
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-const log = (msg) => console.log('[ML]', msg);
-let pendingTipo = 'popup';
-let pendingTitulo = '';
-const _open = window.open;
-let resetPopup = () => {};
+  const log = (msg) => console.log('[ML]', msg);
+  let pendingTipo = 'popup';
+  let pendingTitulo = '';
+  const _open = window.open;
+  let resetPopup = () => { };
 
   // ─────────────────────────────────────────────────────────────
   // 2. BLOQUEIOS DE SISTEMA E COMUNICAÇÃO
@@ -59,7 +59,7 @@ let resetPopup = () => {};
         get() { return null; },
         set() { return true; },
       });
-    } catch (_) {}
+    } catch (_) { }
     window.addEventListener('beforeunload', (e) => { delete e.returnValue; }, true);
   }
 
@@ -79,7 +79,7 @@ let resetPopup = () => {};
         if (retriesObj) {
           Object.keys(retriesObj).forEach((k) => { if (k.includes(titulo)) delete retriesObj[k]; });
         }
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -158,44 +158,47 @@ let resetPopup = () => {};
 
 
 
-   async function dispensarModalContinuar() {
-  const btn = await waitFor(
-    () => [...document.querySelectorAll('button, .swal2-deny, .swal2-cancel')]
-      .find((b) => /não|nao/i.test(b.textContent.trim())),
-    5000
-  );
-  if (btn) { log('Modal "continuar de onde parou" — clicando em Não'); btn.click(); await delay(500); }
-}
+  async function dispensarModalContinuar() {
+    const btn = await waitFor(
+      () => document.querySelector('.modal-btn-nao'),
+      8000
+    );
+    if (btn) {
+      log('Modal "continuar de onde parou" — clicando em Não');
+      btn.click();
+      await delay(500);
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────
   // 5. NAVEGAÇÃO E CONCLUSÃO DE TELA
   // ─────────────────────────────────────────────────────────────
   async function fecharEtapaFinalizada() {
-  log('Iniciando tentativa de fechar...');
-  GM_setValue('ml_popup_titulo', '');
+    log('Iniciando tentativa de fechar...');
+    GM_setValue('ml_popup_titulo', '');
 
-  const btn = [...document.querySelectorAll('button, a, [role="button"]')].find((b) =>
-    /sair|fechar|close|etapa finalizada/i.test(b.textContent.trim())
-  );
-  if (btn) {
-    log('Clicando no botão de fechar: ' + btn.textContent.trim());
-    btn.click();
-    await delay(1000);
-  } else {
-    log('Nenhum botão encontrado, verificando apenas texto de conclusão...');
+    const btn = [...document.querySelectorAll('button, a, [role="button"]')].find((b) =>
+      /sair|fechar|close|etapa finalizada/i.test(b.textContent.trim())
+    );
+    if (btn) {
+      log('Clicando no botão de fechar: ' + btn.textContent.trim());
+      btn.click();
+      await delay(1000);
+    } else {
+      log('Nenhum botão encontrado, verificando apenas texto de conclusão...');
+    }
+
+    log('Aguardando 3 segundos antes de fechar...');
+    await delay(3000); // ← novo
+
+    log('Finalizando processo e fechando janela.');
+    neutralizarBeforeUnload();
+    await delay(500);
+    window.close();
+    setTimeout(() => {
+      if (!window.closed) window.location.href = 'about:blank';
+    }, 1000);
   }
-
-  log('Aguardando 3 segundos antes de fechar...');
-  await delay(3000); // ← novo
-
-  log('Finalizando processo e fechando janela.');
-  neutralizarBeforeUnload();
-  await delay(500);
-  window.close();
-  setTimeout(() => {
-    if (!window.closed) window.location.href = 'about:blank';
-  }, 1000);
-}
 
 
   async function navegarAteOFim() {
@@ -226,17 +229,17 @@ let resetPopup = () => {};
         window.API.LMSSetValue('cmi.suspend_data', 'Congratulations');
         window.API.LMSCommit('');
         window.API.LMSSetValue('cmi.core.score.raw', '100');
-      } catch (_) {}
+      } catch (_) { }
     }
     try {
       if (window.parent !== window)
         window.parent.postMessage({ func: 'finalizacaoOther', message: 'Você chegou ao final da aula!' }, '*');
       window.postMessage({ func: 'finalizacaoOther', message: 'Você chegou ao final da aula!' }, '*');
-    } catch (_) {}
+    } catch (_) { }
     try {
       localStorage.setItem('cmi.core.lesson_status', 'Congratulations - completed');
       localStorage.setItem('cmi.core.lesson_location', 'Congratulations');
-    } catch (_) {}
+    } catch (_) { }
     [
       'telaFinalizacao',
       'telaFinalizacaoOther1',
@@ -343,72 +346,77 @@ let resetPopup = () => {};
   // 7. FLUXO DOS POPUPS
   // ─────────────────────────────────────────────────────────────
   async function initPopup() {
-  await delay(800);
+    await delay(800);
 
-  const urlFim = window.location.pathname.includes('EncerramentoAula');
-  const textoFimEncontrado = [...document.querySelectorAll('h1,h2,h3,h4,h5,.title,strong.text-success,.swal2-title')]
-    .some(el => el.textContent.includes('Etapa finalizada'));
+    const urlFim = window.location.pathname.includes('EncerramentoAula');
+    const textoFimEncontrado = [...document.querySelectorAll('h1,h2,h3,h4,h5,.title,strong.text-success,.swal2-title')]
+      .some(el => el.textContent.includes('Etapa finalizada'));
 
-  if (urlFim || textoFimEncontrado) {
-    await fecharEtapaFinalizada();
-    return;
-  }
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const tipoUrl   = urlParams.get('ml_tipo');         // vem do pendingTipo via window.open
-  const tipoGM    = GM_getValue('ml_tipo_atividade', '');
-
-  // Usa o TIPO_POR_TITULO como fallback — mesmo mapa da página principal
-  const tituloUrl = decodeURIComponent(urlParams.get('ml_titulo') || '');
-  const tipoDoTitulo = tituloUrl
-    ? TIPO_POR_TITULO[tituloUrl.toLowerCase().trim()]
-    : null;
-
-  const tipo = tipoUrl || tipoDoTitulo || tipoGM || 'popup';
-  log(`Tipo → URL:${tipoUrl} | Título:${tituloUrl}→${tipoDoTitulo} | GM:${tipoGM} → ${tipo}`);
-
-  if (tipo === 'quiz')           { await fluxoQuiz();         return; }
-  if (tipo === 'pense-responda') { await fluxoPenseResponda(); return; }
-  if (tipo === 'mao-na-massa')   { await fluxoMaoNaMassa();    return; }
-  if (tipo === 'teorico')        { await fluxoTeorico();       return; }
-  if (tipo === 'questionamento') { await fluxoTeorico();       return; }
-
-  log('Tipo não mapeado: ' + tipo);
-}
-
-// Nova função — detecta pelo texto visível na página do popup
-function detectarTipoPeloDOM() {
-  const mapa = [
-    { palavras: ['teste seus conhecimentos'],          tipo: 'quiz'           },
-    { palavras: ['pense e responda'],                  tipo: 'pense-responda' },
-    { palavras: ['mão na massa', 'mao na massa'],      tipo: 'mao-na-massa'   },
-    { palavras: ['questionamento'],                    tipo: 'questionamento' },
-    { palavras: ['teórico', 'teorico', 'assistir'],    tipo: 'teorico'        },
-  ];
-
-  const textoVisivel = normalizarTexto(
-    [...document.querySelectorAll('h1,h2,h3,h4,h5,.title,.card-title,header,nav,[class*="titulo"],[class*="header"]')]
-      .map(el => el.textContent)
-      .join(' ')
-  );
-
-  for (const { palavras, tipo } of mapa) {
-    if (palavras.some(p => textoVisivel.includes(normalizarTexto(p)))) {
-      log(`Tipo detectado pelo DOM: "${tipo}"`);
-      return tipo;
+    if (urlFim || textoFimEncontrado) {
+      await fecharEtapaFinalizada();
+      return;
     }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const tipoUrl = urlParams.get('ml_tipo');         // vem do pendingTipo via window.open
+    const tipoGM = GM_getValue('ml_tipo_atividade', '');
+
+    // Usa o TIPO_POR_TITULO como fallback — mesmo mapa da página principal
+    const tituloUrl = decodeURIComponent(urlParams.get('ml_titulo') || '');
+    const tipoDoTitulo = tituloUrl
+      ? TIPO_POR_TITULO[tituloUrl.toLowerCase().trim()]
+      : null;
+
+    const tipo = tipoUrl || tipoDoTitulo || tipoGM || 'popup';
+    log(`Tipo → URL:${tipoUrl} | Título:${tituloUrl}→${tipoDoTitulo} | GM:${tipoGM} → ${tipo}`);
+
+    if (tipo === 'quiz') { await fluxoQuiz(); return; }
+    if (tipo === 'pense-responda') { await fluxoPenseResponda(); return; }
+    if (tipo === 'mao-na-massa') { await fluxoMaoNaMassa(); return; }
+    if (tipo === 'teorico') { await fluxoTeorico(); return; }
+    if (tipo === 'questionamento') { await fluxoTeorico(); return; }
+
+    log('Tipo não mapeado: ' + tipo);
   }
-  return null; // não encontrado, cai no GM_getValue como fallback
-}
+
+  // Nova função — detecta pelo texto visível na página do popup
+  function detectarTipoPeloDOM() {
+    const mapa = [
+      { palavras: ['teste seus conhecimentos'], tipo: 'quiz' },
+      { palavras: ['pense e responda'], tipo: 'pense-responda' },
+      { palavras: ['mão na massa', 'mao na massa'], tipo: 'mao-na-massa' },
+      { palavras: ['questionamento'], tipo: 'questionamento' },
+      { palavras: ['teórico', 'teorico', 'assistir'], tipo: 'teorico' },
+    ];
+
+    const textoVisivel = normalizarTexto(
+      [...document.querySelectorAll('h1,h2,h3,h4,h5,.title,.card-title,header,nav,[class*="titulo"],[class*="header"]')]
+        .map(el => el.textContent)
+        .join(' ')
+    );
+
+    for (const { palavras, tipo } of mapa) {
+      if (palavras.some(p => textoVisivel.includes(normalizarTexto(p)))) {
+        log(`Tipo detectado pelo DOM: "${tipo}"`);
+        return tipo;
+      }
+    }
+    return null; // não encontrado, cai no GM_getValue como fallback
+  }
 
 
   async function fluxoTeorico() {
-  await dispensarModalContinuar(); // ← adicionar
+    // Dispara em paralelo — não bloqueia o fluxo principal
+    dispensarModalContinuar().catch(() => { });
 
     log('fluxoTeorico: aguardando SCORM API carregar...');
     const scormReady = await waitFor(() => window.API, 15000);
     if (!scormReady) log('SCORM API não carregou, tentando mesmo assim...');
     else log('SCORM API detectado!');
+
+    // Segunda tentativa após SCORM carregar (modal pode aparecer aqui)
+    dispensarModalContinuar().catch(() => { });
+
     skipSCORM();
     log('fluxoTeorico: aguardando tela "Etapa finalizada"...');
     const tela = await waitFor(
@@ -427,8 +435,8 @@ function detectarTipoPeloDOM() {
   }
 
 
-async function fluxoMaoNaMassa() {
-  await dispensarModalContinuar(); // ← adicionar
+  async function fluxoMaoNaMassa() {
+    await dispensarModalContinuar(); // ← adicionar
 
     const comecar = await waitFor(() => findBtn('começar', 'comecar', 'iniciar'), 8000);
     if (comecar) { log('comecar'); comecar.click(); await delay(1000); }
@@ -451,12 +459,12 @@ async function fluxoMaoNaMassa() {
     );
 
     if (btnFechar) {
-        log('Clicando em FECHAR');
-        btnFechar.click();
+      log('Clicando em FECHAR');
+      btnFechar.click();
     } else {
-        log('Botão FECHAR não encontrado');
-        GM_setValue('ml_popup_titulo', '');
-        return;
+      log('Botão FECHAR não encontrado');
+      GM_setValue('ml_popup_titulo', '');
+      return;
     }
 
     await waitFor(() => window.location.pathname.includes('EncerramentoAula'), 8000);
@@ -467,7 +475,7 @@ async function fluxoMaoNaMassa() {
     await delay(500);
 
     GM_setValue('ml_popup_titulo', '');
-    try { window.open('', '_self'); window.close(); } catch (_) {}
+    try { window.open('', '_self'); window.close(); } catch (_) { }
   }
 
   async function fluxoQuiz() {
@@ -513,15 +521,15 @@ async function fluxoMaoNaMassa() {
   }
 
   const TIPO_POR_TITULO = {
-  'teórico': 'teorico',
-   'teórica': 'teorico',
-  'mão na massa': 'mao-na-massa',
-  'pense e responda': 'pense-responda',
-  'pensa e responda': 'pense-responda',  // ← alias para o typo dessa disciplina
-  'questionamento': 'questionamento',
-  'testes seus conhecimentos': 'quiz',
-  'teste seus conhecimentos': 'quiz',
-};
+    'teórico': 'teorico',
+    'teórica': 'teorico',
+    'mão na massa': 'mao-na-massa',
+    'pense e responda': 'pense-responda',
+    'pensa e responda': 'pense-responda',  // ← alias para o typo dessa disciplina
+    'questionamento': 'questionamento',
+    'testes seus conhecimentos': 'quiz',
+    'teste seus conhecimentos': 'quiz',
+  };
 
   function getTipo(btn) {
     const titulo = (btn.getAttribute('title') || '').toLowerCase().trim();
@@ -532,38 +540,38 @@ async function fluxoMaoNaMassa() {
   }
 
   async function handlePopup(btn, getPopup) {
-  const tipo = getTipo(btn);
+    const tipo = getTipo(btn);
 
-  GM_setValue('ml_tipo_atividade', tipo);
-  pendingTipo   = tipo;
-  pendingTitulo = btn.getAttribute('title') || '';
+    GM_setValue('ml_tipo_atividade', tipo);
+    pendingTipo = tipo;
+    pendingTitulo = btn.getAttribute('title') || '';
 
-  resetPopup();
+    resetPopup();
 
-  const card = btn.closest('.card-body');
+    const card = btn.closest('.card-body');
 
-  if (tipo === 'questionamento') {
-    await handleQuestionamento(btn, getPopup);
-    return 'concluida';
+    if (tipo === 'questionamento') {
+      await handleQuestionamento(btn, getPopup);
+      return 'concluida';
+    }
+
+    GM_setValue('ml_popup_titulo', pendingTitulo);
+    GM_setValue('ml_popup_ts', Date.now());
+    GM_setValue('ml_popup_hb', Date.now());
+
+    btn.click();
+    await delay(500);
+
+    if (tipo === 'mao-na-massa') {
+      const webBtn = await waitFor(() => document.querySelector('#btnWebAtividades'), 6000);
+      if (webBtn) webBtn.click();
+    }
+
+    const resultado = await waitAtividadeConcluida(card, btn, tipo === 'quiz' ? 300000 : 120000);
+    GM_setValue('ml_popup_titulo', '');
+    GM_setValue('ml_popup_ts', 0);
+    return resultado;
   }
-
-  GM_setValue('ml_popup_titulo', pendingTitulo);
-  GM_setValue('ml_popup_ts', Date.now());
-  GM_setValue('ml_popup_hb', Date.now());
-
-  btn.click();
-  await delay(500);
-
-  if (tipo === 'mao-na-massa') {
-    const webBtn = await waitFor(() => document.querySelector('#btnWebAtividades'), 6000);
-    if (webBtn) webBtn.click();
-  }
-
-  const resultado = await waitAtividadeConcluida(card, btn, tipo === 'quiz' ? 300000 : 120000);
-  GM_setValue('ml_popup_titulo', '');
-  GM_setValue('ml_popup_ts', 0);
-  return resultado;
-}
 
   async function waitAtividadeConcluida(cardEl, btn, timeout = 300000) {
     const startTime = Date.now();
@@ -574,8 +582,8 @@ async function fluxoMaoNaMassa() {
       await delay(1500);
 
       if (GM_getValue('ml_popup_titulo', '') === '') {
-          log(`Sinal de fechamento amigável recebido do popup: ${tituloAtividade}`);
-          return 'concluida';
+        log(`Sinal de fechamento amigável recebido do popup: ${tituloAtividade}`);
+        return 'concluida';
       }
 
       if (document.body.contains(cardEl)) {
@@ -585,9 +593,9 @@ async function fluxoMaoNaMassa() {
 
         const hb = GM_getValue('ml_popup_hb', 0);
         if (Date.now() - startTime > 15000 && Date.now() - hb > 15000) {
-           log(`Sinal de vida inativo durante monitoramento de: ${tituloAtividade}.`);
-           GM_setValue('ml_popup_titulo', '');
-           return 'falha_sinal_vida';
+          log(`Sinal de vida inativo durante monitoramento de: ${tituloAtividade}.`);
+          GM_setValue('ml_popup_titulo', '');
+          return 'falha_sinal_vida';
         }
         continue;
       }
@@ -616,28 +624,28 @@ async function fluxoMaoNaMassa() {
   // 8. PÁGINA PRINCIPAL
   // ─────────────────────────────────────────────────────────────
   function initMainPage() {
-  if (!document.head || !document.body) {
-    setTimeout(initMainPage, 100);
-    return;
-  }
-
-  if (document.getElementById('ml-panel')) return;
-
-  let currentPopup = null;
-  resetPopup = () => { currentPopup = null; };
-
-  window.open = function (...args) {
-    if (args[0] && typeof args[0] === 'string') {
-      const sep = args[0].includes('?') ? '&' : '?';
-      args[0] = args[0]
-        + sep + 'ml_tipo='   + encodeURIComponent(pendingTipo)
-        + '&ml_titulo='      + encodeURIComponent(pendingTitulo);
+    if (!document.head || !document.body) {
+      setTimeout(initMainPage, 100);
+      return;
     }
-    currentPopup = _open.apply(this, args);
-    return currentPopup;
-  };
 
-  document.head.insertAdjacentHTML('beforeend', `
+    if (document.getElementById('ml-panel')) return;
+
+    let currentPopup = null;
+    resetPopup = () => { currentPopup = null; };
+
+    window.open = function (...args) {
+      if (args[0] && typeof args[0] === 'string') {
+        const sep = args[0].includes('?') ? '&' : '?';
+        args[0] = args[0]
+          + sep + 'ml_tipo=' + encodeURIComponent(pendingTipo)
+          + '&ml_titulo=' + encodeURIComponent(pendingTitulo);
+      }
+      currentPopup = _open.apply(this, args);
+      return currentPopup;
+    };
+
+    document.head.insertAdjacentHTML('beforeend', `
     <style>
       #ml-panel{position:fixed;bottom:20px;right:20px;background:#1e1e2e;color:#cdd6f4;
         border:1px solid #45475a;border-radius:12px;padding:16px;width:210px;
@@ -660,7 +668,7 @@ async function fluxoMaoNaMassa() {
     </style>
   `);
 
-  document.body.insertAdjacentHTML('beforeend', `
+    document.body.insertAdjacentHTML('beforeend', `
     <div id="ml-panel">
       <header id="ml-hdr"><b>ML AUTO v5.1.0</b><small id="ml-min">-</small></header>
       <div id="ml-body">
@@ -673,80 +681,80 @@ async function fluxoMaoNaMassa() {
     </div>
   `);
 
-  const setSt = (m) => { const e = document.getElementById('ml-status'); if (e) e.textContent = m; };
-  const setPct = (p) => { const e = document.getElementById('ml-bar');   if (e) e.style.width = p + '%'; };
+    const setSt = (m) => { const e = document.getElementById('ml-status'); if (e) e.textContent = m; };
+    const setPct = (p) => { const e = document.getElementById('ml-bar'); if (e) e.style.width = p + '%'; };
 
-  makeDraggable(document.getElementById('ml-panel'), document.getElementById('ml-hdr'));
+    makeDraggable(document.getElementById('ml-panel'), document.getElementById('ml-hdr'));
 
-  document.getElementById('ml-min').onclick = () => {
-    const b = document.getElementById('ml-body');
-    const h = b.style.display === 'none';
-    b.style.display = h ? '' : 'none';
-    document.getElementById('ml-min').textContent = h ? '-' : '+';
-  };
+    document.getElementById('ml-min').onclick = () => {
+      const b = document.getElementById('ml-body');
+      const h = b.style.display === 'none';
+      b.style.display = h ? '' : 'none';
+      document.getElementById('ml-min').textContent = h ? '-' : '+';
+    };
 
-  let running = false;
+    let running = false;
 
-  async function iniciarExecucao() {
-    if (running) return;
-    running = true;
-    GM_setValue('ml_running', Date.now());
-    document.getElementById('ml-start').disabled = true;
-    document.getElementById('ml-stop').style.display  = '';
-    document.getElementById('ml-reset').style.display = 'none';
-    setPct(0);
+    async function iniciarExecucao() {
+      if (running) return;
+      running = true;
+      GM_setValue('ml_running', Date.now());
+      document.getElementById('ml-start').disabled = true;
+      document.getElementById('ml-stop').style.display = '';
+      document.getElementById('ml-reset').style.display = 'none';
+      setPct(0);
 
-    await runAll(setSt, setPct, () => !running, () => currentPopup);
+      await runAll(setSt, setPct, () => !running, () => currentPopup);
 
-    running = false;
-    GM_setValue('ml_running', 0);
-    document.getElementById('ml-start').disabled = false;
-    document.getElementById('ml-stop').style.display  = 'none';
-    document.getElementById('ml-reset').style.display = 'none';
+      running = false;
+      GM_setValue('ml_running', 0);
+      document.getElementById('ml-start').disabled = false;
+      document.getElementById('ml-stop').style.display = 'none';
+      document.getElementById('ml-reset').style.display = 'none';
+    }
+
+    document.getElementById('ml-start').onclick = () => iniciarExecucao();
+
+    document.getElementById('ml-stop').onclick = () => {
+      running = false;
+      GM_setValue('ml_running', 0);
+      setSt('Parado.');
+      document.getElementById('ml-start').disabled = false;
+      document.getElementById('ml-stop').style.display = 'none';
+      document.getElementById('ml-reset').style.display = '';
+    };
+
+    document.getElementById('ml-reset').onclick = () => {
+      GM_setValue('ml_popup_titulo', '');
+      GM_setValue('ml_popup_ts', 0);
+      GM_setValue('ml_popup_hb', 0);
+      GM_setValue('ml_retries', '{}');
+      GM_setValue('ml_running', 0);
+      document.getElementById('ml-reset').style.display = 'none';
+      setSt('Estado resetado. Pronto.');
+      log('Estado GM limpo manualmente.');
+    };
+
+    // Limpa estado zumbi deixado por popup fechado manualmente
+    const tituloZumbi = GM_getValue('ml_popup_titulo', '');
+    const hbZumbi = GM_getValue('ml_popup_hb', 0);
+    if (tituloZumbi && Date.now() - hbZumbi > 20000) {
+      log(`Estado zumbi detectado ("${tituloZumbi}") — limpando.`);
+      GM_setValue('ml_popup_titulo', '');
+      GM_setValue('ml_popup_ts', 0);
+      GM_setValue('ml_popup_hb', 0);
+      GM_setValue('ml_retries', '{}'); // ← ADICIONAR ESTA LINHA
+    }
+
+    const ultimoHeartbeat = GM_getValue('ml_running', 0);
+    const segundosAtras = (Date.now() - ultimoHeartbeat) / 1000;
+
+    if (ultimoHeartbeat > 0 && segundosAtras < 30) {
+      log(`Retomando após reload (${segundosAtras.toFixed(1)}s atrás)...`);
+      setSt('Retomando...');
+      setTimeout(() => iniciarExecucao(), 3000);
+    }
   }
-
-  document.getElementById('ml-start').onclick = () => iniciarExecucao();
-
-  document.getElementById('ml-stop').onclick = () => {
-    running = false;
-    GM_setValue('ml_running', 0);
-    setSt('Parado.');
-    document.getElementById('ml-start').disabled = false;
-    document.getElementById('ml-stop').style.display  = 'none';
-    document.getElementById('ml-reset').style.display = '';
-  };
-
-  document.getElementById('ml-reset').onclick = () => {
-    GM_setValue('ml_popup_titulo', '');
-    GM_setValue('ml_popup_ts', 0);
-    GM_setValue('ml_popup_hb', 0);
-    GM_setValue('ml_retries', '{}');
-    GM_setValue('ml_running', 0);
-    document.getElementById('ml-reset').style.display = 'none';
-    setSt('Estado resetado. Pronto.');
-    log('Estado GM limpo manualmente.');
-  };
-
-  // Limpa estado zumbi deixado por popup fechado manualmente
-  const tituloZumbi = GM_getValue('ml_popup_titulo', '');
-const hbZumbi     = GM_getValue('ml_popup_hb', 0);
-if (tituloZumbi && Date.now() - hbZumbi > 20000) {
-  log(`Estado zumbi detectado ("${tituloZumbi}") — limpando.`);
-  GM_setValue('ml_popup_titulo', '');
-  GM_setValue('ml_popup_ts', 0);
-  GM_setValue('ml_popup_hb', 0);
-  GM_setValue('ml_retries', '{}'); // ← ADICIONAR ESTA LINHA
-}
-
-  const ultimoHeartbeat = GM_getValue('ml_running', 0);
-  const segundosAtras   = (Date.now() - ultimoHeartbeat) / 1000;
-
-  if (ultimoHeartbeat > 0 && segundosAtras < 30) {
-    log(`Retomando após reload (${segundosAtras.toFixed(1)}s atrás)...`);
-    setSt('Retomando...');
-    setTimeout(() => iniciarExecucao(), 3000);
-  }
-}
 
 
   function makeDraggable(panel, handle) {
@@ -791,9 +799,9 @@ if (tituloZumbi && Date.now() - hbZumbi > 20000) {
         await esperarDOMEstavel(5000);
 
         if (GM_getValue('ml_popup_titulo', '') === '') {
-            log('Sinal de fechamento amigável após reload.');
-            limparEstadoPopup(popupTituloEmAndamento, true, retriesPorAtividade);
-            break;
+          log('Sinal de fechamento amigável após reload.');
+          limparEstadoPopup(popupTituloEmAndamento, true, retriesPorAtividade);
+          break;
         }
 
         const cardDoPopup = [...document.querySelectorAll('.card-body')].find((cb) => {
@@ -815,9 +823,9 @@ if (tituloZumbi && Date.now() - hbZumbi > 20000) {
 
         const hb = GM_getValue('ml_popup_hb', 0);
         if (Date.now() - inicio > 15000 && Date.now() - hb > 15000) {
-            log('Sinal de vida inativo. O popup falhou ou foi fechado sem avisar. Cancelando a espera.');
-            limparEstadoPopup(popupTituloEmAndamento, false, retriesPorAtividade);
-            break;
+          log('Sinal de vida inativo. O popup falhou ou foi fechado sem avisar. Cancelando a espera.');
+          limparEstadoPopup(popupTituloEmAndamento, false, retriesPorAtividade);
+          break;
         }
 
         log('Card ainda pendente — aguardando atividade (Sinal de vida ativo)...');
